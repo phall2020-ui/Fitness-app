@@ -21,12 +21,186 @@ import Charts
 import VisionKit
 import AVFoundation
 import Speech
+import CoreLocation
+
+// MARK: - Premium Theme Tokens
+
+extension Color {
+    // Backgrounds
+    static let ironBackground = Color(red: 0.05, green: 0.05, blue: 0.07)
+    static let ironCardBg = Color(red: 0.1, green: 0.1, blue: 0.15).opacity(0.5)
+    static let ironCardDark = Color(red: 0.08, green: 0.08, blue: 0.12)
+    
+    // Accents
+    static let ironPrimary = Color(red: 0.35, green: 0.45, blue: 0.95)
+    static let ironPurple = Color(red: 0.65, green: 0.30, blue: 0.95)
+    static let ironSuccess = Color(red: 0.00, green: 0.80, blue: 0.55)
+    static let ironWarning = Color(red: 1.00, green: 0.60, blue: 0.20)
+    static let ironError = Color(red: 0.90, green: 0.25, blue: 0.35)
+    
+    // Text
+    static let ironTextPrimary = Color.white
+    static let ironTextSecondary = Color.gray
+}
+
+struct IronGradients {
+    static let primary = LinearGradient(
+        colors: [.ironPrimary, .ironPurple],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+    
+    static let glassStroke = LinearGradient(
+        colors: [.white.opacity(0.3), .white.opacity(0.05)],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+}
+
+struct Layout {
+    static let cornerRadius: CGFloat = 20
+    static let padding: CGFloat = 16
+}
+
+struct GlassModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background(.ultraThinMaterial)
+            .background(Color.ironCardBg)
+            .cornerRadius(Layout.cornerRadius)
+            .overlay(
+                RoundedRectangle(cornerRadius: Layout.cornerRadius)
+                    .stroke(IronGradients.glassStroke, lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.4), radius: 10, x: 0, y: 5)
+    }
+}
+
+struct PrimaryButtonModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .font(.headline)
+            .foregroundColor(.white)
+            .padding()
+            .frame(maxWidth: .infinity)
+            .background(IronGradients.primary)
+            .cornerRadius(Layout.cornerRadius)
+            .shadow(color: .ironPrimary.opacity(0.5), radius: 8, x: 0, y: 4)
+    }
+}
+
+extension View {
+    func ironGlassCard() -> some View {
+        modifier(GlassModifier())
+    }
+    
+    func ironPrimaryButton() -> some View {
+        modifier(PrimaryButtonModifier())
+    }
+    
+    func backgroundColor(_ color: Color) -> some View {
+        background(color)
+    }
+}
 
 // MARK: - 1) ENUMS & STRUCTS
 
 enum ExerciseType: String, Codable, CaseIterable { case weightAndReps, bodyweight, duration }
 enum SetType: String, Codable, CaseIterable { case warmup, working, failure, drop }
 enum Gender: String, Codable { case male, female }
+enum MuscleGroup: String, Codable, CaseIterable { case chest, back, legs, shoulders, arms, abs, cardio, other }
+
+// MARK: - Gym Location Model
+
+@Model
+final class GymLocation {
+    @Attribute(.unique) var id: UUID
+    var name: String
+    var latitude: Double
+    var longitude: Double
+    var radiusMeters: Double
+    
+    init(name: String, latitude: Double, longitude: Double, radiusMeters: Double = 100) {
+        self.id = UUID()
+        self.name = name
+        self.latitude = latitude
+        self.longitude = longitude
+        self.radiusMeters = radiusMeters
+    }
+    
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+}
+
+// MARK: - Exercise Reference Model
+
+@Model
+final class Exercise {
+    @Attribute(.unique) var id: UUID
+    var name: String
+    var muscleGroup: MuscleGroup
+    
+    init(name: String, muscleGroup: MuscleGroup) {
+        self.id = UUID()
+        self.name = name
+        self.muscleGroup = muscleGroup
+    }
+}
+
+struct WeightliftingConstants {
+    static let defaultExercises: [(name: String, muscleGroup: MuscleGroup)] = [
+        ("Bench Press", .chest),
+        ("Incline Bench Press", .chest),
+        ("Decline Bench Press", .chest),
+        ("Dumbbell Fly", .chest),
+        ("Cable Crossover", .chest),
+        ("Push Up", .chest),
+        ("Squat", .legs),
+        ("Front Squat", .legs),
+        ("Leg Press", .legs),
+        ("Leg Extension", .legs),
+        ("Leg Curl", .legs),
+        ("Romanian Deadlift", .legs),
+        ("Lunges", .legs),
+        ("Calf Raise", .legs),
+        ("Deadlift", .back),
+        ("Barbell Row", .back),
+        ("Dumbbell Row", .back),
+        ("Lat Pulldown", .back),
+        ("Pull Up", .back),
+        ("Chin Up", .back),
+        ("Seated Row", .back),
+        ("T-Bar Row", .back),
+        ("Face Pull", .back),
+        ("Overhead Press", .shoulders),
+        ("Dumbbell Shoulder Press", .shoulders),
+        ("Lateral Raise", .shoulders),
+        ("Front Raise", .shoulders),
+        ("Rear Delt Fly", .shoulders),
+        ("Shrugs", .shoulders),
+        ("Barbell Curl", .arms),
+        ("Dumbbell Curl", .arms),
+        ("Hammer Curl", .arms),
+        ("Preacher Curl", .arms),
+        ("Tricep Pushdown", .arms),
+        ("Overhead Tricep Extension", .arms),
+        ("Skull Crushers", .arms),
+        ("Dips", .arms),
+        ("Close Grip Bench Press", .arms),
+        ("Crunch", .abs),
+        ("Plank", .abs),
+        ("Hanging Leg Raise", .abs),
+        ("Cable Crunch", .abs),
+        ("Ab Wheel Rollout", .abs),
+        ("Russian Twist", .abs),
+        ("Running", .cardio),
+        ("Cycling", .cardio),
+        ("Rowing", .cardio),
+        ("Stair Climber", .cardio),
+        ("Jump Rope", .cardio)
+    ]
+}
 
 enum ActivityLevel: Double, Codable, CaseIterable {
     case sedentary = 1.2
@@ -46,23 +220,6 @@ enum ActivityLevel: Double, Codable, CaseIterable {
 
 enum MealCategory: String, Codable, CaseIterable { case breakfast, lunch, dinner, snack }
 
-enum FoodCategory: String, Codable, CaseIterable {
-    case protein = "Protein"
-    case carbs = "Carbs"
-    case fats = "Fats"
-    case vegetables = "Vegetables"
-    case dairy = "Dairy"
-    case fruit = "Fruit"
-}
-
-enum BadgeType: String, Codable, CaseIterable {
-    case firstLog
-    case streak3
-    case streak7
-    case proteinGoal
-    case recipeCreator
-}
-
 struct Plate: Identifiable {
     let id = UUID()
     let weight: Double
@@ -71,39 +228,52 @@ struct Plate: Identifiable {
 
 // MARK: - 2) SWIFTDATA MODELS (APP)
 
+@Model
+class DailyConfirmation {
+    @Attribute(.unique) var id: String // Use date string as unique ID
+    var date: Date
+    var isConfirmed: Bool
+    
+    init(date: Date, isConfirmed: Bool = true) {
+        let startOfDay = Calendar.current.startOfDay(for: date)
+        self.date = startOfDay
+        self.id = startOfDay.ISO8601Format()
+        self.isConfirmed = isConfirmed
+    }
+}
+
 // --- User & Nutrition ---
 
 @Model
 final class UserProfile {
-    var gender: Gender = .male
+    var gender: Gender = Gender.male
     var age: Int = 30
     var heightCm: Double = 175.0
-    var activityLevel: ActivityLevel = .moderatelyActive
+    var activityLevel: ActivityLevel = ActivityLevel.moderatelyActive
     var goalRatePerWeekKg: Double = -0.5
-    
-    var currentWeight: Double
-    var caloricGoal: Int
-    var proteinGoal: Int
-    
-    // Per-meal budget percentages (must sum to 1.0)
-    var mealBudgetBreakfast: Double = 0.25
-    var mealBudgetLunch: Double = 0.35
-    var mealBudgetDinner: Double = 0.30
-    var mealBudgetSnack: Double = 0.10
-    
-    init(currentWeight: Double = 70.0, caloricGoal: Int = 2500, proteinGoal: Int = 150) {
+
+    var currentWeight: Double = 70.0
+    var caloricGoal: Int = 2500
+    var proteinGoal: Int = 150
+    var carbsGoal: Int = 250
+    var fatsGoal: Int = 70
+
+    // Meal percentage distribution (sum should equal 100)
+    var breakfastPercentage: Int = 25
+    var lunchPercentage: Int = 35
+    var dinnerPercentage: Int = 30
+    var snackPercentage: Int = 10
+
+    init(currentWeight: Double = 70.0, caloricGoal: Int = 2500, proteinGoal: Int = 150, carbsGoal: Int = 250, fatsGoal: Int = 70, breakfastPercentage: Int = 25, lunchPercentage: Int = 35, dinnerPercentage: Int = 30, snackPercentage: Int = 10) {
         self.currentWeight = currentWeight
         self.caloricGoal = caloricGoal
         self.proteinGoal = proteinGoal
-    }
-    
-    func getBudgetPercentage(for meal: MealCategory) -> Double {
-        switch meal {
-        case .breakfast: return mealBudgetBreakfast
-        case .lunch: return mealBudgetLunch
-        case .dinner: return mealBudgetDinner
-        case .snack: return mealBudgetSnack
-        }
+        self.carbsGoal = carbsGoal
+        self.fatsGoal = fatsGoal
+        self.breakfastPercentage = breakfastPercentage
+        self.lunchPercentage = lunchPercentage
+        self.dinnerPercentage = dinnerPercentage
+        self.snackPercentage = snackPercentage
     }
 }
 
@@ -129,8 +299,10 @@ final class FoodItem {
     var fats: Double
     var defaultServingSize: Double
     var barcode: String?
+    var category: String?  // "Cheat Meal", "McDonald's", "KFC", etc.
+    var restaurant: String?
     
-    init(name: String, calories: Int, protein: Double, carbs: Double, fats: Double, defaultServingSize: Double = 100, barcode: String? = nil) {
+    init(name: String, calories: Int, protein: Double, carbs: Double, fats: Double, defaultServingSize: Double = 100, barcode: String? = nil, category: String? = nil, restaurant: String? = nil) {
         self.id = UUID()
         self.name = name
         self.calories = calories
@@ -139,8 +311,191 @@ final class FoodItem {
         self.fats = fats
         self.defaultServingSize = defaultServingSize
         self.barcode = barcode
+        self.category = category
+        self.restaurant = restaurant
     }
 }
+
+// MARK: - Cheat Meals Database
+
+enum CheatMealCategory: String, CaseIterable {
+    case burgers = "Burgers"
+    case chicken = "Chicken"
+    case pizza = "Pizza"
+    case mexican = "Mexican"
+    case asian = "Asian"
+    case subs = "Subs & Sandwiches"
+    case sides = "Sides"
+    case desserts = "Desserts"
+    case drinks = "Drinks"
+}
+
+struct CheatMealDatabase {
+    
+    static let allMeals: [(name: String, calories: Int, protein: Double, carbs: Double, fats: Double, serving: Double, restaurant: String, category: CheatMealCategory)] = [
+        // === McDONALD'S ===
+        ("Big Mac", 550, 25, 45, 30, 1, "McDonald's", .burgers),
+        ("Quarter Pounder with Cheese", 520, 30, 42, 26, 1, "McDonald's", .burgers),
+        ("McChicken", 400, 14, 40, 21, 1, "McDonald's", .chicken),
+        ("Chicken McNuggets (6pc)", 250, 15, 15, 15, 1, "McDonald's", .chicken),
+        ("Chicken McNuggets (20pc)", 830, 49, 51, 50, 1, "McDonald's", .chicken),
+        ("Large Fries", 490, 7, 66, 23, 1, "McDonald's", .sides),
+        ("McFlurry Oreo", 510, 12, 80, 17, 1, "McDonald's", .desserts),
+        ("Double Cheeseburger", 450, 25, 34, 24, 1, "McDonald's", .burgers),
+        ("Filet-O-Fish", 390, 16, 39, 19, 1, "McDonald's", .burgers),
+        ("Egg McMuffin", 310, 17, 30, 13, 1, "McDonald's", .burgers),
+        
+        // === BURGER KING ===
+        ("Whopper", 660, 28, 49, 40, 1, "Burger King", .burgers),
+        ("Whopper with Cheese", 740, 32, 50, 46, 1, "Burger King", .burgers),
+        ("Double Whopper", 900, 48, 49, 56, 1, "Burger King", .burgers),
+        ("Chicken Royale", 570, 24, 48, 31, 1, "Burger King", .chicken),
+        ("Bacon Double Cheeseburger", 370, 22, 27, 19, 1, "Burger King", .burgers),
+        
+        // === KFC ===
+        ("Original Recipe Chicken Breast", 390, 39, 11, 21, 1, "KFC", .chicken),
+        ("Original Recipe Chicken Thigh", 280, 19, 9, 18, 1, "KFC", .chicken),
+        ("Zinger Burger", 450, 22, 40, 22, 1, "KFC", .chicken),
+        ("Boneless Banquet", 680, 35, 60, 32, 1, "KFC", .chicken),
+        ("Popcorn Chicken (Large)", 560, 28, 36, 33, 1, "KFC", .chicken),
+        ("Gravy (Regular)", 70, 2, 10, 2, 1, "KFC", .sides),
+        ("Coleslaw (Regular)", 150, 1, 14, 10, 1, "KFC", .sides),
+        ("Fries (Regular)", 280, 4, 38, 12, 1, "KFC", .sides),
+        
+        // === NANDO'S ===
+        ("1/2 Chicken", 550, 65, 2, 32, 1, "Nando's", .chicken),
+        ("Butterfly Chicken", 340, 53, 1, 14, 1, "Nando's", .chicken),
+        ("Chicken Thighs (3pc)", 380, 30, 0, 28, 1, "Nando's", .chicken),
+        ("Peri-Peri Chips (Regular)", 340, 5, 45, 15, 1, "Nando's", .sides),
+        ("Spicy Rice (Regular)", 250, 6, 48, 4, 1, "Nando's", .sides),
+        ("Garlic Bread", 180, 4, 22, 9, 1, "Nando's", .sides),
+        
+        // === SUBWAY ===
+        ("Meatball Marinara (Footlong)", 960, 44, 108, 36, 1, "Subway", .subs),
+        ("Italian BMT (Footlong)", 820, 38, 90, 32, 1, "Subway", .subs),
+        ("Chicken Teriyaki (Footlong)", 740, 48, 100, 14, 1, "Subway", .subs),
+        ("Tuna (Footlong)", 940, 40, 90, 44, 1, "Subway", .subs),
+        ("Steak & Cheese (Footlong)", 740, 48, 90, 20, 1, "Subway", .subs),
+        ("Turkey Breast (6 inch)", 280, 18, 46, 4, 1, "Subway", .subs),
+        ("Cookies (3 pack)", 540, 6, 72, 24, 1, "Subway", .desserts),
+        
+        // === DOMINO'S ===
+        ("Pepperoni Passion (Medium, whole)", 1800, 78, 168, 86, 1, "Domino's", .pizza),
+        ("Pepperoni Passion (1 slice)", 225, 10, 21, 11, 1, "Domino's", .pizza),
+        ("Mighty Meaty (Medium, whole)", 1920, 90, 168, 92, 1, "Domino's", .pizza),
+        ("Mighty Meaty (1 slice)", 240, 11, 21, 12, 1, "Domino's", .pizza),
+        ("Margherita (Medium, whole)", 1440, 60, 168, 56, 1, "Domino's", .pizza),
+        ("Texas BBQ (Medium, whole)", 1760, 84, 176, 76, 1, "Domino's", .pizza),
+        ("Garlic Pizza Bread", 670, 18, 72, 34, 1, "Domino's", .sides),
+        ("Chicken Strippers (7pc)", 470, 42, 24, 22, 1, "Domino's", .sides),
+        ("Cookies (4 pack)", 680, 8, 92, 32, 1, "Domino's", .desserts),
+        
+        // === PIZZA HUT ===
+        ("Super Supreme (Medium, whole)", 2160, 96, 192, 104, 1, "Pizza Hut", .pizza),
+        ("Meat Feast (Medium, whole)", 2080, 104, 184, 100, 1, "Pizza Hut", .pizza),
+        ("Stuffed Crust Margherita (1 slice)", 280, 12, 28, 14, 1, "Pizza Hut", .pizza),
+        ("Garlic Bread (4pc)", 460, 10, 52, 24, 1, "Pizza Hut", .sides),
+        
+        // === FIVE GUYS ===
+        ("Cheeseburger", 840, 47, 40, 55, 1, "Five Guys", .burgers),
+        ("Bacon Cheeseburger", 920, 51, 40, 62, 1, "Five Guys", .burgers),
+        ("Little Hamburger", 480, 23, 39, 26, 1, "Five Guys", .burgers),
+        ("Cajun Fries (Regular)", 520, 8, 60, 28, 1, "Five Guys", .sides),
+        ("Cajun Fries (Large)", 950, 14, 110, 51, 1, "Five Guys", .sides),
+        ("Bacon Dog", 620, 22, 40, 42, 1, "Five Guys", .burgers),
+        
+        // === TACO BELL ===
+        ("Crunchy Taco", 170, 8, 13, 10, 1, "Taco Bell", .mexican),
+        ("Crunchy Taco Supreme", 190, 8, 14, 11, 1, "Taco Bell", .mexican),
+        ("Burrito Supreme - Beef", 390, 16, 43, 16, 1, "Taco Bell", .mexican),
+        ("Quesadilla - Chicken", 510, 27, 37, 28, 1, "Taco Bell", .mexican),
+        ("Nachos BellGrande", 740, 16, 82, 38, 1, "Taco Bell", .mexican),
+        ("Cinnamon Twists", 170, 1, 26, 7, 1, "Taco Bell", .desserts),
+        
+        // === CHIPOTLE ===
+        ("Chicken Burrito (Full Build)", 1050, 58, 102, 42, 1, "Chipotle", .mexican),
+        ("Steak Bowl", 680, 42, 52, 32, 1, "Chipotle", .mexican),
+        ("Chicken Quesadilla", 780, 48, 52, 42, 1, "Chipotle", .mexican),
+        ("Chips & Guacamole", 770, 10, 73, 49, 1, "Chipotle", .sides),
+        
+        // === CHINESE TAKEAWAY ===
+        ("Sweet & Sour Chicken Balls", 680, 28, 68, 32, 1, "Chinese Takeaway", .asian),
+        ("Chicken Chow Mein", 520, 32, 58, 16, 1, "Chinese Takeaway", .asian),
+        ("Egg Fried Rice (Large)", 480, 12, 72, 16, 1, "Chinese Takeaway", .asian),
+        ("Crispy Aromatic Duck (Quarter)", 620, 38, 4, 50, 1, "Chinese Takeaway", .asian),
+        ("Spring Rolls (4pc)", 320, 8, 36, 16, 1, "Chinese Takeaway", .asian),
+        ("Prawn Crackers", 280, 2, 24, 20, 1, "Chinese Takeaway", .sides),
+        
+        // === INDIAN TAKEAWAY ===
+        ("Chicken Tikka Masala", 580, 42, 22, 36, 1, "Indian Takeaway", .asian),
+        ("Lamb Bhuna", 640, 38, 14, 48, 1, "Indian Takeaway", .asian),
+        ("Pilau Rice", 350, 8, 62, 8, 1, "Indian Takeaway", .sides),
+        ("Naan Bread", 320, 10, 52, 8, 1, "Indian Takeaway", .sides),
+        ("Onion Bhaji (2pc)", 280, 6, 28, 16, 1, "Indian Takeaway", .sides),
+        ("Samosa (2pc)", 340, 8, 36, 18, 1, "Indian Takeaway", .sides),
+        
+        // === GREGGS ===
+        ("Sausage Roll", 327, 7, 24, 22, 1, "Greggs", .subs),
+        ("Steak Bake", 408, 13, 35, 24, 1, "Greggs", .subs),
+        ("Chicken Bake", 457, 17, 38, 27, 1, "Greggs", .subs),
+        ("Vegan Sausage Roll", 312, 11, 26, 18, 1, "Greggs", .subs),
+        ("Festive Bake", 458, 14, 37, 28, 1, "Greggs", .subs),
+        ("Yum Yum (3 pack)", 450, 4, 54, 24, 1, "Greggs", .desserts),
+        
+        // === DRINKS ===
+        ("Coca-Cola (500ml)", 210, 0, 53, 0, 1, "Drinks", .drinks),
+        ("Coca-Cola (Large McDonald's)", 290, 0, 76, 0, 1, "McDonald's", .drinks),
+        ("Milkshake Chocolate (Large)", 580, 14, 92, 18, 1, "McDonald's", .drinks),
+        ("Fanta Orange (500ml)", 225, 0, 54, 0, 1, "Drinks", .drinks),
+        ("Costa Latte (Large)", 180, 10, 16, 8, 1, "Costa", .drinks),
+        ("Starbucks Frappuccino (Grande)", 380, 5, 60, 14, 1, "Starbucks", .drinks),
+        
+        // === DESSERTS ===
+        ("Ben & Jerry's Cookie Dough (500ml)", 1200, 16, 140, 62, 1, "Ice Cream", .desserts),
+        ("Häagen-Dazs Salted Caramel (500ml)", 1160, 16, 112, 72, 1, "Ice Cream", .desserts),
+        ("Krispy Kreme Original Glazed", 190, 3, 22, 11, 1, "Krispy Kreme", .desserts),
+        ("Krispy Kreme Chocolate Dreamcake", 350, 4, 42, 19, 1, "Krispy Kreme", .desserts),
+    ]
+    
+    @MainActor
+    static func seedDatabase(context: ModelContext) {
+        // Check if already seeded
+        let descriptor = FetchDescriptor<FoodItem>(predicate: #Predicate { $0.category == "Cheat Meal" })
+        let existingCount = (try? context.fetchCount(descriptor)) ?? 0
+        
+        guard existingCount == 0 else { return }  // Already seeded
+        
+        for meal in allMeals {
+            let foodItem = FoodItem(
+                name: "\(meal.restaurant) - \(meal.name)",
+                calories: meal.calories,
+                protein: meal.protein,
+                carbs: meal.carbs,
+                fats: meal.fats,
+                defaultServingSize: meal.serving,
+                category: "Cheat Meal",
+                restaurant: meal.restaurant
+            )
+            context.insert(foodItem)
+        }
+        
+        try? context.save()
+        print("🍔 Cheat meals database seeded with \(allMeals.count) items")
+    }
+    
+    static func getRestaurants() -> [String] {
+        Array(Set(allMeals.map { $0.restaurant })).sorted()
+    }
+    
+    static func getMealsByRestaurant(_ restaurant: String) -> [(name: String, calories: Int, protein: Double, carbs: Double, fats: Double, serving: Double, restaurant: String, category: CheatMealCategory)] {
+        allMeals.filter { $0.restaurant == restaurant }
+    }
+    
+    static func getMealsByCategory(_ category: CheatMealCategory) -> [(name: String, calories: Int, protein: Double, carbs: Double, fats: Double, serving: Double, restaurant: String, category: CheatMealCategory)] {
+        allMeals.filter { $0.category == category }
+    }
+}
+
 
 @Model
 final class FoodLog {
@@ -152,11 +507,8 @@ final class FoodLog {
     var carbs: Double
     var fats: Double
     var category: MealCategory
-    var isFavorite: Bool = false
-    var sourceType: String = "manual"  // "manual", "barcode", "generic"
-    var sourceId: String?              // GenericFood.id or gtin14 for lookup
     
-    init(timestamp: Date = Date(), foodName: String, servingSize: Double, calories: Int, protein: Double, carbs: Double, fats: Double, category: MealCategory, isFavorite: Bool = false, sourceType: String = "manual", sourceId: String? = nil) {
+    init(timestamp: Date = Date(), foodName: String, servingSize: Double, calories: Int, protein: Double, carbs: Double, fats: Double, category: MealCategory) {
         self.timestamp = timestamp
         self.foodName = foodName
         self.servingSize = servingSize
@@ -165,203 +517,7 @@ final class FoodLog {
         self.carbs = carbs
         self.fats = fats
         self.category = category
-        self.isFavorite = isFavorite
-        self.sourceType = sourceType
-        self.sourceId = sourceId
     }
-}
-
-@Model
-final class MealTemplate {
-    @Attribute(.unique) var id: UUID
-    var name: String
-    var meal: MealCategory
-    var createdAt: Date
-    
-    @Relationship(deleteRule: .cascade)
-    var items: [MealTemplateItem] = []
-    
-    init(id: UUID = UUID(), name: String, meal: MealCategory, createdAt: Date = Date()) {
-        self.id = id
-        self.name = name
-        self.meal = meal
-        self.createdAt = createdAt
-    }
-    
-    var totalCalories: Int { items.reduce(0) { $0 + $1.calories } }
-    var totalProtein: Double { items.reduce(0) { $0 + $1.protein } }
-    var totalCarbs: Double { items.reduce(0) { $0 + $1.carbs } }
-    var totalFats: Double { items.reduce(0) { $0 + $1.fats } }
-}
-
-@Model
-final class MealTemplateItem {
-    var id: UUID
-    var foodName: String
-    var servingSize: Double
-    var calories: Int
-    var protein: Double
-    var carbs: Double
-    var fats: Double
-    
-    var template: MealTemplate?
-    
-    init(id: UUID = UUID(), foodName: String, servingSize: Double, calories: Int, protein: Double, carbs: Double, fats: Double, template: MealTemplate? = nil) {
-        self.id = id
-        self.foodName = foodName
-        self.servingSize = servingSize
-        self.calories = calories
-        self.protein = protein
-        self.carbs = carbs
-        self.fats = fats
-        self.template = template
-    }
-}
-
-@Model
-final class Recipe {
-    @Attribute(.unique) var id: UUID
-    var name: String
-    var servings: Int
-    var createdAt: Date
-    
-    @Relationship(deleteRule: .cascade)
-    var ingredients: [RecipeIngredient] = []
-    
-    init(id: UUID = UUID(), name: String, servings: Int = 1, createdAt: Date = Date()) {
-        self.id = id
-        self.name = name
-        self.servings = max(1, servings)
-        self.createdAt = createdAt
-    }
-    
-    private var safeServings: Double { Double(max(1, servings)) }
-    
-    var totalCalories: Int { ingredients.reduce(0) { $0 + $1.calories } }
-    var totalProtein: Double { ingredients.reduce(0) { $0 + $1.protein } }
-    var totalCarbs: Double { ingredients.reduce(0) { $0 + $1.carbs } }
-    var totalFats: Double { ingredients.reduce(0) { $0 + $1.fats } }
-    
-    var caloriesPerServing: Int { Int((Double(totalCalories) / safeServings).rounded()) }
-    var proteinPerServing: Double { totalProtein / safeServings }
-    var carbsPerServing: Double { totalCarbs / safeServings }
-    var fatsPerServing: Double { totalFats / safeServings }
-}
-
-@Model
-final class RecipeIngredient {
-    var id: UUID
-    var name: String
-    var amount: Double
-    var calories: Int
-    var protein: Double
-    var carbs: Double
-    var fats: Double
-    
-    var recipe: Recipe?
-    
-    init(id: UUID = UUID(), name: String, amount: Double, calories: Int, protein: Double, carbs: Double, fats: Double, recipe: Recipe? = nil) {
-        self.id = id
-        self.name = name
-        self.amount = amount
-        self.calories = calories
-        self.protein = protein
-        self.carbs = carbs
-        self.fats = fats
-        self.recipe = recipe
-    }
-}
-
-@Model
-final class AchievementBadge {
-    @Attribute(.unique) var id: UUID
-    var type: BadgeType
-    var title: String
-    var detail: String
-    var icon: String
-    var unlockedAt: Date
-    
-    init(id: UUID = UUID(), type: BadgeType, title: String, detail: String, icon: String, unlockedAt: Date = Date()) {
-        self.id = id
-        self.type = type
-        self.title = title
-        self.detail = detail
-        self.icon = icon
-        self.unlockedAt = unlockedAt
-    }
-}
-
-// --- Generic Ingredients (no brand) ---
-
-@Model
-final class GenericFood {
-    @Attribute(.unique) var id: String
-    var name: String
-    var category: FoodCategory
-    var kcalPer100g: Double
-    var proteinPer100g: Double
-    var carbsPer100g: Double
-    var fatPer100g: Double
-    var fibrePer100g: Double
-    var typicalServingG: Double
-    
-    init(id: String, name: String, category: FoodCategory, kcalPer100g: Double, proteinPer100g: Double, carbsPer100g: Double, fatPer100g: Double, fibrePer100g: Double = 0, typicalServingG: Double = 100) {
-        self.id = id
-        self.name = name
-        self.category = category
-        self.kcalPer100g = kcalPer100g
-        self.proteinPer100g = proteinPer100g
-        self.carbsPer100g = carbsPer100g
-        self.fatPer100g = fatPer100g
-        self.fibrePer100g = fibrePer100g
-        self.typicalServingG = typicalServingG
-    }
-    
-    /// Pre-populated generic foods with USDA-sourced nutritional data
-    static let seedData: [GenericFood] = [
-        // Proteins
-        GenericFood(id: "chicken_breast_raw", name: "Chicken Breast (Raw)", category: .protein, kcalPer100g: 120, proteinPer100g: 22.5, carbsPer100g: 0, fatPer100g: 2.6, typicalServingG: 150),
-        GenericFood(id: "chicken_breast_cooked", name: "Chicken Breast (Cooked)", category: .protein, kcalPer100g: 165, proteinPer100g: 31, carbsPer100g: 0, fatPer100g: 3.6, typicalServingG: 130),
-        GenericFood(id: "chicken_thigh_cooked", name: "Chicken Thigh (Cooked)", category: .protein, kcalPer100g: 209, proteinPer100g: 26, carbsPer100g: 0, fatPer100g: 11, typicalServingG: 100),
-        GenericFood(id: "beef_mince_5fat", name: "Beef Mince (5% Fat)", category: .protein, kcalPer100g: 137, proteinPer100g: 21, carbsPer100g: 0, fatPer100g: 5, typicalServingG: 150),
-        GenericFood(id: "beef_steak", name: "Beef Sirloin Steak", category: .protein, kcalPer100g: 206, proteinPer100g: 26, carbsPer100g: 0, fatPer100g: 11, typicalServingG: 200),
-        GenericFood(id: "salmon_fillet", name: "Salmon Fillet", category: .protein, kcalPer100g: 208, proteinPer100g: 20, carbsPer100g: 0, fatPer100g: 13, fibrePer100g: 0, typicalServingG: 125),
-        GenericFood(id: "tuna_canned_water", name: "Tuna (Canned in Water)", category: .protein, kcalPer100g: 116, proteinPer100g: 26, carbsPer100g: 0, fatPer100g: 0.8, typicalServingG: 100),
-        GenericFood(id: "whole_egg", name: "Whole Egg", category: .protein, kcalPer100g: 155, proteinPer100g: 13, carbsPer100g: 1.1, fatPer100g: 11, typicalServingG: 50),
-        GenericFood(id: "egg_white", name: "Egg White Only", category: .protein, kcalPer100g: 52, proteinPer100g: 11, carbsPer100g: 0.7, fatPer100g: 0.2, typicalServingG: 33),
-        
-        // Carbs
-        GenericFood(id: "white_rice_cooked", name: "White Rice (Cooked)", category: .carbs, kcalPer100g: 130, proteinPer100g: 2.7, carbsPer100g: 28, fatPer100g: 0.3, fibrePer100g: 0.4, typicalServingG: 150),
-        GenericFood(id: "brown_rice_cooked", name: "Brown Rice (Cooked)", category: .carbs, kcalPer100g: 112, proteinPer100g: 2.6, carbsPer100g: 24, fatPer100g: 0.9, fibrePer100g: 1.8, typicalServingG: 150),
-        GenericFood(id: "oats_dry", name: "Oats (Dry)", category: .carbs, kcalPer100g: 389, proteinPer100g: 17, carbsPer100g: 66, fatPer100g: 7, fibrePer100g: 10, typicalServingG: 40),
-        GenericFood(id: "sweet_potato_baked", name: "Sweet Potato (Baked)", category: .carbs, kcalPer100g: 90, proteinPer100g: 2, carbsPer100g: 21, fatPer100g: 0.1, fibrePer100g: 3.3, typicalServingG: 130),
-        GenericFood(id: "white_potato_baked", name: "White Potato (Baked)", category: .carbs, kcalPer100g: 93, proteinPer100g: 2.5, carbsPer100g: 21, fatPer100g: 0.1, fibrePer100g: 2.2, typicalServingG: 150),
-        GenericFood(id: "pasta_cooked", name: "Pasta (Cooked)", category: .carbs, kcalPer100g: 131, proteinPer100g: 5, carbsPer100g: 25, fatPer100g: 1.1, fibrePer100g: 1.8, typicalServingG: 180),
-        GenericFood(id: "bread_white", name: "White Bread", category: .carbs, kcalPer100g: 265, proteinPer100g: 9, carbsPer100g: 49, fatPer100g: 3.2, fibrePer100g: 2.7, typicalServingG: 30),
-        GenericFood(id: "bread_wholemeal", name: "Wholemeal Bread", category: .carbs, kcalPer100g: 247, proteinPer100g: 13, carbsPer100g: 41, fatPer100g: 3.4, fibrePer100g: 7, typicalServingG: 30),
-        
-        // Fats
-        GenericFood(id: "olive_oil", name: "Olive Oil", category: .fats, kcalPer100g: 884, proteinPer100g: 0, carbsPer100g: 0, fatPer100g: 100, typicalServingG: 15),
-        GenericFood(id: "almonds", name: "Almonds", category: .fats, kcalPer100g: 579, proteinPer100g: 21, carbsPer100g: 22, fatPer100g: 50, fibrePer100g: 12, typicalServingG: 30),
-        GenericFood(id: "peanut_butter", name: "Peanut Butter", category: .fats, kcalPer100g: 588, proteinPer100g: 25, carbsPer100g: 20, fatPer100g: 50, fibrePer100g: 6, typicalServingG: 32),
-        GenericFood(id: "avocado", name: "Avocado", category: .fats, kcalPer100g: 160, proteinPer100g: 2, carbsPer100g: 9, fatPer100g: 15, fibrePer100g: 7, typicalServingG: 100),
-        
-        // Vegetables
-        GenericFood(id: "broccoli_cooked", name: "Broccoli (Cooked)", category: .vegetables, kcalPer100g: 35, proteinPer100g: 2.4, carbsPer100g: 7, fatPer100g: 0.4, fibrePer100g: 3.3, typicalServingG: 80),
-        GenericFood(id: "spinach_raw", name: "Spinach (Raw)", category: .vegetables, kcalPer100g: 23, proteinPer100g: 2.9, carbsPer100g: 3.6, fatPer100g: 0.4, fibrePer100g: 2.2, typicalServingG: 30),
-        GenericFood(id: "mixed_salad", name: "Mixed Salad Leaves", category: .vegetables, kcalPer100g: 17, proteinPer100g: 1.5, carbsPer100g: 2.5, fatPer100g: 0.2, fibrePer100g: 1.8, typicalServingG: 50),
-        
-        // Dairy
-        GenericFood(id: "greek_yogurt_0fat", name: "Greek Yogurt (0% Fat)", category: .dairy, kcalPer100g: 59, proteinPer100g: 10, carbsPer100g: 3.6, fatPer100g: 0.7, typicalServingG: 170),
-        GenericFood(id: "greek_yogurt_full", name: "Greek Yogurt (Full Fat)", category: .dairy, kcalPer100g: 97, proteinPer100g: 9, carbsPer100g: 3.4, fatPer100g: 5, typicalServingG: 170),
-        GenericFood(id: "cottage_cheese", name: "Cottage Cheese", category: .dairy, kcalPer100g: 98, proteinPer100g: 11, carbsPer100g: 3.4, fatPer100g: 4.3, typicalServingG: 150),
-        GenericFood(id: "milk_semi", name: "Semi-Skimmed Milk", category: .dairy, kcalPer100g: 50, proteinPer100g: 3.4, carbsPer100g: 4.8, fatPer100g: 1.8, typicalServingG: 250),
-        
-        // Fruit
-        GenericFood(id: "banana", name: "Banana", category: .fruit, kcalPer100g: 89, proteinPer100g: 1.1, carbsPer100g: 23, fatPer100g: 0.3, fibrePer100g: 2.6, typicalServingG: 120),
-        GenericFood(id: "apple", name: "Apple", category: .fruit, kcalPer100g: 52, proteinPer100g: 0.3, carbsPer100g: 14, fatPer100g: 0.2, fibrePer100g: 2.4, typicalServingG: 180),
-        GenericFood(id: "blueberries", name: "Blueberries", category: .fruit, kcalPer100g: 57, proteinPer100g: 0.7, carbsPer100g: 14, fatPer100g: 0.3, fibrePer100g: 2.4, typicalServingG: 80)
-    ]
 }
 
 // --- Training ---
@@ -376,10 +532,13 @@ final class WorkoutSession {
     @Relationship(deleteRule: .cascade)
     var exercises: [WorkoutExercise] = []
     
-    init(startTime: Date = Date(), title: String = "New Workout") {
+    var gym: GymLocation?
+    
+    init(startTime: Date = Date(), title: String = "New Workout", gym: GymLocation? = nil) {
         self.id = UUID()
         self.startTime = startTime
         self.title = title
+        self.gym = gym
     }
     
     var totalVolume: Double {
@@ -397,11 +556,13 @@ final class WorkoutExercise {
     var sets: [ExerciseSet] = []
     
     var workout: WorkoutSession?
+    var exerciseRef: Exercise?
     
-    init(exerciseName: String, orderIndex: Int) {
+    init(exerciseName: String, orderIndex: Int, exerciseRef: Exercise? = nil) {
         self.id = UUID()
         self.exerciseName = exerciseName
         self.orderIndex = orderIndex
+        self.exerciseRef = exerciseRef
     }
     
     var volume: Double {
@@ -573,7 +734,7 @@ public final class FoodProduct {
         self.nutrientsBlob = nutrients.flatMap { try? JSONEncoder().encode($0) }
     }
     
-    public var nutrients: FoodNutrients? {
+public var nutrients: FoodNutrients? {
         get {
             guard let nutrientsBlob else { return nil }
             return try? JSONDecoder().decode(FoodNutrients.self, from: nutrientsBlob)
@@ -629,11 +790,25 @@ public struct FoodProductDTO: Codable, Sendable {
     }
 }
 
+extension FoodProductDTO {
+    init(model: FoodProduct) {
+        self.gtin14 = model.gtin14
+        self.name = model.name
+        self.brand = model.brand
+        self.imageURL = model.imageURL
+        self.servingSizeG = model.servingSizeG
+        self.servingDescription = model.servingDescription
+        self.nutrients = model.nutrients
+        self.source = model.source
+        self.lastVerifiedAt = model.lastVerifiedAt
+    }
+}
+
 // 3.3 SwiftDataFoodCache.swift
 
 public protocol FoodCache: Sendable {
-    func getProduct(gtin14: String) async throws -> FoodProduct?
-    func upsertProduct(_ product: FoodProduct) async throws
+    func getProduct(gtin14: String) async throws -> FoodProductDTO?
+    func upsertProduct(_ product: FoodProductDTO) async throws
 }
 
 @MainActor
@@ -644,16 +819,21 @@ public final class SwiftDataFoodCache: FoodCache {
         self.context = context
     }
     
-    public func getProduct(gtin14: String) async throws -> FoodProduct? {
+    public func getProduct(gtin14: String) async throws -> FoodProductDTO? {
         let descriptor = FetchDescriptor<FoodProduct>(
             predicate: #Predicate { $0.gtin14 == gtin14 },
             sortBy: []
         )
-        return try context.fetch(descriptor).first
+        return try context.fetch(descriptor).first.map { FoodProductDTO(model: $0) }
     }
     
-    public func upsertProduct(_ product: FoodProduct) async throws {
-        if let existing = try await getProduct(gtin14: product.gtin14) {
+    public func upsertProduct(_ product: FoodProductDTO) async throws {
+        let descriptor = FetchDescriptor<FoodProduct>(
+            predicate: #Predicate { $0.gtin14 == product.gtin14 },
+            sortBy: []
+        )
+        
+        if let existing = try context.fetch(descriptor).first {
             existing.name = product.name
             existing.brand = product.brand
             existing.imageURL = product.imageURL
@@ -663,7 +843,7 @@ public final class SwiftDataFoodCache: FoodCache {
             existing.source = product.source
             existing.lastVerifiedAt = product.lastVerifiedAt
         } else {
-            context.insert(product)
+            context.insert(product.toModel())
         }
         try context.save()
     }
@@ -706,6 +886,63 @@ public struct HTTPFoodBackendClient: FoodBackendClient {
     }
 }
 
+private struct BackendSearchResponse: Codable {
+    let results: [FoodProductDTO]
+    let count: Int
+}
+
+extension HTTPFoodBackendClient: NutritionAPIClient {
+    public func searchFoods(_ query: String) async throws -> [FoodSearchResult] {
+        var url = baseURL
+        url.append(path: "/v1/foods/search")
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: true)!
+        components.queryItems = [
+            URLQueryItem(name: "query", value: query),
+            URLQueryItem(name: "limit", value: "20")
+        ]
+        
+        guard let finalURL = components.url else { throw URLError(.badURL) }
+        
+        var req = URLRequest(url: finalURL)
+        req.httpMethod = "GET"
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        
+        let (data, resp) = try await session.data(for: req)
+        guard let http = resp as? HTTPURLResponse else { return [] }
+        
+        guard (200...299).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+        
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        
+        // Handle both simple list and paginated response
+        if let list = try? decoder.decode([FoodProductDTO].self, from: data) {
+            return list.map { $0.toSearchResult() }
+        }
+        
+        let result = try decoder.decode(BackendSearchResponse.self, from: data)
+        return result.results.map { $0.toSearchResult() }
+    }
+}
+
+extension FoodProductDTO {
+    func toSearchResult() -> FoodSearchResult {
+        FoodSearchResult(
+            name: name,
+            brand: brand,
+            calories: Int(nutrients?.kcalPer100g ?? 0),
+            protein: nutrients?.proteinPer100g ?? 0,
+            carbs: nutrients?.carbsPer100g ?? 0,
+            fats: nutrients?.fatPer100g ?? 0,
+            servingSize: servingSizeG ?? 100,
+            servingDescription: servingDescription,
+            source: .onlineAPI
+        )
+    }
+}
+
 // 3.5 FoodLookupService.swift
 
 public enum FoodLookupSource: String, Sendable {
@@ -714,7 +951,7 @@ public enum FoodLookupSource: String, Sendable {
 }
 
 public struct FoodLookupOutcome: Sendable {
-    public let product: FoodProduct
+    public let product: FoodProductDTO
     public let source: FoodLookupSource
     public let normalized: NormalizedBarcode
 }
@@ -727,30 +964,255 @@ public enum FoodLookupError: Error {
 public actor FoodLookupService {
     private let cache: FoodCache
     private let backend: FoodBackendClient
-    
+
     public init(cache: FoodCache, backend: FoodBackendClient) {
         self.cache = cache
         self.backend = backend
     }
-    
+
     public func lookup(rawBarcode: String) async throws -> FoodLookupOutcome {
         let normalized = try GS1Barcode.normalize(rawBarcode)
-        
+
         for key in normalized.alternates {
             if let cached = try await cache.getProduct(gtin14: key) {
                 return FoodLookupOutcome(product: cached, source: .localCache, normalized: normalized)
             }
         }
-        
+
         for key in normalized.alternates {
             if let dto = try await backend.fetchByGTIN14(key) {
-                let model = dto.toModel()
-                try await cache.upsertProduct(model)
-                return FoodLookupOutcome(product: model, source: .backend, normalized: normalized)
+                try await cache.upsertProduct(dto)
+                return FoodLookupOutcome(product: dto, source: .backend, normalized: normalized)
             }
         }
-        
+
         throw FoodLookupError.notFound
+    }
+}
+
+// 3.6 FoodSearchService.swift
+
+public struct FoodSearchResult: Identifiable, Sendable {
+    public let id = UUID()
+    public let name: String
+    public let brand: String?
+    public let calories: Int
+    public let protein: Double
+    public let carbs: Double
+    public let fats: Double
+    public let servingSize: Double
+    public let servingDescription: String?
+    public let source: FoodSearchSource
+}
+
+public enum FoodSearchSource: String, Sendable {
+    case localCache
+    case recentLogs
+    case savedFoods
+    case onlineAPI
+}
+
+public protocol NutritionAPIClient: Sendable {
+    func searchFoods(_ query: String) async throws -> [FoodSearchResult]
+}
+
+public struct USDANutritionAPIClient: NutritionAPIClient {
+    public let apiKey: String
+    public let session: URLSession
+
+    public init(apiKey: String, session: URLSession = .shared) {
+        self.apiKey = apiKey
+        self.session = session
+    }
+
+    public func searchFoods(_ query: String) async throws -> [FoodSearchResult] {
+        // USDA FoodData Central API
+        var components = URLComponents(string: "https://api.nal.usda.gov/fdc/v1/foods/search")!
+        components.queryItems = [
+            URLQueryItem(name: "api_key", value: apiKey),
+            URLQueryItem(name: "query", value: query),
+            URLQueryItem(name: "pageSize", value: "20"),
+            URLQueryItem(name: "dataType", value: "Foundation,SR Legacy")
+        ]
+
+        guard let url = components.url else { throw URLError(.badURL) }
+
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let (data, resp) = try await session.data(for: req)
+        guard let http = resp as? HTTPURLResponse else { return [] }
+
+        guard (200...299).contains(http.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+
+        let decoder = JSONDecoder()
+        let response = try decoder.decode(USDASearchResponse.self, from: data)
+
+        return response.foods.map { food in
+            let nutrients = food.foodNutrients
+            let kcal = nutrients.first(where: { $0.nutrientName.contains("Energy") && $0.unitName == "KCAL" })?.value ?? 0
+            let protein = nutrients.first(where: { $0.nutrientName.contains("Protein") })?.value ?? 0
+            let carbs = nutrients.first(where: { $0.nutrientName.contains("Carbohydrate") })?.value ?? 0
+            let fat = nutrients.first(where: { $0.nutrientName.contains("Total lipid") })?.value ?? 0
+
+            return FoodSearchResult(
+                name: food.description,
+                brand: food.brandOwner,
+                calories: Int(kcal),
+                protein: protein,
+                carbs: carbs,
+                fats: fat,
+                servingSize: food.servingSize ?? 100,
+                servingDescription: food.servingSizeUnit,
+                source: .onlineAPI
+            )
+        }
+    }
+}
+
+private struct USDASearchResponse: Codable {
+    let foods: [USDAFood]
+}
+
+private struct USDAFood: Codable {
+    let description: String
+    let brandOwner: String?
+    let servingSize: Double?
+    let servingSizeUnit: String?
+    let foodNutrients: [USDANutrient]
+}
+
+private struct USDANutrient: Codable {
+    let nutrientName: String
+    let unitName: String
+    let value: Double
+}
+
+public actor FoodSearchService {
+    private let context: ModelContext
+    private let nutritionAPI: NutritionAPIClient?
+
+    public init(context: ModelContext, nutritionAPI: NutritionAPIClient? = nil) {
+        self.context = context
+        self.nutritionAPI = nutritionAPI
+    }
+    
+    public var hasOnlineSource: Bool { nutritionAPI != nil }
+
+    public func searchLocal(_ query: String) throws -> [FoodSearchResult] {
+        guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return []
+        }
+
+        var results: [FoodSearchResult] = []
+        let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Saved foods
+        let savedFoodsDescriptor = FetchDescriptor<FoodItem>(
+            predicate: #Predicate { item in
+                item.name.localizedStandardContains(normalizedQuery)
+            },
+            sortBy: [SortDescriptor(\.name)]
+        )
+        
+        if let savedFoods = try? context.fetch(savedFoodsDescriptor) {
+            results.append(contentsOf: savedFoods.prefix(5).map { food in
+                FoodSearchResult(
+                    name: food.name,
+                    brand: food.restaurant,
+                    calories: food.calories,
+                    protein: food.protein,
+                    carbs: food.carbs,
+                    fats: food.fats,
+                    servingSize: food.defaultServingSize,
+                    servingDescription: "\(Int(food.defaultServingSize))g",
+                    source: .savedFoods
+                )
+            })
+        }
+        
+        // Recent logs
+        let logsDescriptor = FetchDescriptor<FoodLog>(
+            predicate: #Predicate { log in
+                log.foodName.localizedStandardContains(normalizedQuery)
+            },
+            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+        )
+        
+        if let recentLogs = try? context.fetch(logsDescriptor) {
+            var seen = Set<String>()
+            let uniqueLogs = recentLogs.filter { log in
+                let key = log.foodName.lowercased()
+                if seen.contains(key) { return false }
+                seen.insert(key)
+                return true
+            }
+            
+            results.append(contentsOf: uniqueLogs.prefix(5).map { log in
+                FoodSearchResult(
+                    name: log.foodName,
+                    brand: nil,
+                    calories: log.calories,
+                    protein: log.protein,
+                    carbs: log.carbs,
+                    fats: log.fats,
+                    servingSize: log.servingSize,
+                    servingDescription: "\(Int(log.servingSize))g",
+                    source: .recentLogs
+                )
+            })
+        }
+        
+        // Cached products
+        let productsDescriptor = FetchDescriptor<FoodProduct>(
+            predicate: #Predicate { product in
+                product.name.localizedStandardContains(normalizedQuery) ||
+                (product.brand != nil && product.brand!.localizedStandardContains(normalizedQuery))
+            },
+            sortBy: [SortDescriptor(\.lastVerifiedAt, order: .reverse)]
+        )
+        
+        if let cachedProducts = try? context.fetch(productsDescriptor) {
+            results.append(contentsOf: cachedProducts.prefix(5).map { product in
+                let nutrients = product.nutrients
+                return FoodSearchResult(
+                    name: product.name,
+                    brand: product.brand,
+                    calories: Int(nutrients?.kcalPer100g ?? 0),
+                    protein: nutrients?.proteinPer100g ?? 0,
+                    carbs: nutrients?.carbsPer100g ?? 0,
+                    fats: nutrients?.fatPer100g ?? 0,
+                    servingSize: product.servingSizeG ?? 100,
+                    servingDescription: product.servingDescription,
+                    source: .localCache
+                )
+            })
+        }
+        
+        return results
+    }
+    
+    public func searchRemote(_ query: String) async throws -> [FoodSearchResult] {
+        guard let api = nutritionAPI,
+              !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return []
+        }
+        return try await api.searchFoods(query)
+    }
+
+    public func search(_ query: String, includeOnline: Bool = false) async throws -> [FoodSearchResult] {
+        var results = try searchLocal(query)
+
+        // Only search online if explicitly requested or no local results found
+        if includeOnline && results.isEmpty {
+            let remote = try await searchRemote(query)
+            results.append(contentsOf: remote)
+        }
+
+        return results
     }
 }
 
@@ -857,445 +1319,7 @@ final class UnsupportedScannerViewController: UIViewController {
     }
 }
 
-// 3.7 Voice Input Components
-
-// MARK: - VoiceInputParser
-struct VoiceInputParser {
-    struct ParsedFoodEntry {
-        let foodName: String
-        let amount: Double
-        let unit: String
-        let mealCategory: MealCategory?
-    }
-
-    static func parse(_ text: String) -> ParsedFoodEntry? {
-        let lowercased = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // Extract meal category
-        var mealCategory: MealCategory?
-        var workingText = lowercased
-
-        if lowercased.contains("breakfast") {
-            mealCategory = .breakfast
-            workingText = workingText.replacingOccurrences(of: "for breakfast", with: "")
-                .replacingOccurrences(of: "breakfast", with: "")
-        } else if lowercased.contains("lunch") {
-            mealCategory = .lunch
-            workingText = workingText.replacingOccurrences(of: "for lunch", with: "")
-                .replacingOccurrences(of: "lunch", with: "")
-        } else if lowercased.contains("dinner") {
-            mealCategory = .dinner
-            workingText = workingText.replacingOccurrences(of: "for dinner", with: "")
-                .replacingOccurrences(of: "dinner", with: "")
-        } else if lowercased.contains("snack") {
-            mealCategory = .snack
-            workingText = workingText.replacingOccurrences(of: "for snack", with: "")
-                .replacingOccurrences(of: "snack", with: "")
-        }
-
-        // Clean up common words
-        workingText = workingText.replacingOccurrences(of: "add ", with: "")
-            .replacingOccurrences(of: "log ", with: "")
-            .replacingOccurrences(of: "for ", with: "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // Pattern: "{amount}{unit} {food name}"
-        // Examples: "200g chicken breast", "100 grams rice", "2 eggs"
-        let pattern = #"(\d+\.?\d*)\s*(g|grams?|kg|kilograms?|ml|oz|ounces?|cups?|tbsp|tsp|pieces?)?\s+(.+)"#
-
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else {
-            return nil
-        }
-
-        let nsRange = NSRange(workingText.startIndex..<workingText.endIndex, in: workingText)
-        guard let match = regex.firstMatch(in: workingText, options: [], range: nsRange) else {
-            return nil
-        }
-
-        // Extract components
-        guard let amountRange = Range(match.range(at: 1), in: workingText),
-              let foodRange = Range(match.range(at: 3), in: workingText) else {
-            return nil
-        }
-
-        let amountStr = String(workingText[amountRange])
-        guard let amount = Double(amountStr) else { return nil }
-
-        var unit = "g"
-        if match.range(at: 2).location != NSNotFound,
-           let unitRange = Range(match.range(at: 2), in: workingText) {
-            let extractedUnit = String(workingText[unitRange]).lowercased()
-            unit = normalizeUnit(extractedUnit)
-        }
-
-        let foodName = String(workingText[foodRange]).trimmingCharacters(in: .whitespaces)
-
-        return ParsedFoodEntry(
-            foodName: foodName,
-            amount: amount,
-            unit: unit,
-            mealCategory: mealCategory
-        )
-    }
-
-    private static func normalizeUnit(_ unit: String) -> String {
-        switch unit.lowercased() {
-        case "g", "gram", "grams": return "g"
-        case "kg", "kilogram", "kilograms": return "kg"
-        case "ml", "milliliter", "milliliters": return "ml"
-        case "oz", "ounce", "ounces": return "oz"
-        case "cup", "cups": return "cups"
-        case "tbsp", "tablespoon", "tablespoons": return "tbsp"
-        case "tsp", "teaspoon", "teaspoons": return "tsp"
-        case "piece", "pieces": return "pieces"
-        default: return "g"
-        }
-    }
-}
-
-// MARK: - VoiceInputViewModel
-@MainActor
-final class VoiceInputViewModel: ObservableObject {
-    enum State {
-        case idle
-        case requestingPermission
-        case listening
-        case processing
-        case success(String)
-        case error(String)
-    }
-
-    @Published var state: State = .idle
-    @Published var recognizedText: String = ""
-
-    private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
-    private var recognitionTask: SFSpeechRecognitionTask?
-    private let audioEngine = AVAudioEngine()
-    private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
-
-    func startRecording() {
-        Task {
-            await requestPermissions()
-        }
-    }
-
-    private func requestPermissions() async {
-        state = .requestingPermission
-
-        // Request speech recognition permission
-        let speechStatus = await withCheckedContinuation { continuation in
-            SFSpeechRecognizer.requestAuthorization { status in
-                continuation.resume(returning: status)
-            }
-        }
-
-        guard speechStatus == .authorized else {
-            state = .error("Speech recognition permission denied")
-            return
-        }
-
-        // Request microphone permission
-        let micStatus = await AVAudioSession.sharedInstance().requestRecordPermission()
-        guard micStatus else {
-            state = .error("Microphone permission denied")
-            return
-        }
-
-        // Start recording
-        do {
-            try startRecognition()
-        } catch {
-            state = .error("Failed to start recording: \(error.localizedDescription)")
-        }
-    }
-
-    private func startRecognition() throws {
-        // Cancel any ongoing task
-        recognitionTask?.cancel()
-        recognitionTask = nil
-
-        // Configure audio session
-        let audioSession = AVAudioSession.sharedInstance()
-        try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
-        try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-
-        // Create recognition request
-        recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
-        guard let recognitionRequest = recognitionRequest else {
-            throw NSError(domain: "VoiceInput", code: -1, userInfo: [NSLocalizedDescriptionKey: "Unable to create recognition request"])
-        }
-
-        recognitionRequest.shouldReportPartialResults = true
-
-        // Get input node
-        let inputNode = audioEngine.inputNode
-
-        // Start recognition task
-        recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
-            guard let self = self else { return }
-
-            var isFinal = false
-
-            if let result = result {
-                Task { @MainActor in
-                    self.recognizedText = result.bestTranscription.formattedString
-                }
-                isFinal = result.isFinal
-            }
-
-            if error != nil || isFinal {
-                Task { @MainActor in
-                    self.stopRecording()
-                    if error != nil {
-                        self.state = .error("Recognition error")
-                    } else {
-                        self.state = .processing
-                    }
-                }
-            }
-        }
-
-        // Configure audio tap
-        let recordingFormat = inputNode.outputFormat(forBus: 0)
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
-            recognitionRequest.append(buffer)
-        }
-
-        // Start audio engine
-        audioEngine.prepare()
-        try audioEngine.start()
-
-        state = .listening
-    }
-
-    func stopRecording() {
-        audioEngine.stop()
-        audioEngine.inputNode.removeTap(onBus: 0)
-        recognitionRequest?.endAudio()
-        recognitionTask?.cancel()
-
-        if state == .listening {
-            state = .processing
-        }
-    }
-
-    func reset() {
-        state = .idle
-        recognizedText = ""
-    }
-}
-
-// MARK: - VoiceInputSheet
-struct VoiceInputSheet: View {
-    @StateObject private var viewModel = VoiceInputViewModel()
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
-
-    let selectedMealCategory: MealCategory
-    let onFoodLogged: () -> Void
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 20) {
-                Spacer()
-
-                // Status icon
-                Group {
-                    switch viewModel.state {
-                    case .idle:
-                        Image(systemName: "mic.circle.fill")
-                            .font(.system(size: 100))
-                            .foregroundColor(.gray)
-                    case .requestingPermission:
-                        ProgressView()
-                            .scaleEffect(2)
-                    case .listening:
-                        Image(systemName: "waveform.circle.fill")
-                            .font(.system(size: 100))
-                            .foregroundColor(.red)
-                            .symbolEffect(.pulse)
-                    case .processing:
-                        ProgressView()
-                            .scaleEffect(2)
-                    case .success:
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 100))
-                            .foregroundColor(.green)
-                    case .error:
-                        Image(systemName: "exclamationmark.circle.fill")
-                            .font(.system(size: 100))
-                            .foregroundColor(.red)
-                    }
-                }
-                .padding()
-
-                // Status text
-                Group {
-                    switch viewModel.state {
-                    case .idle:
-                        Text("Tap to start")
-                            .font(.title2)
-                    case .requestingPermission:
-                        Text("Requesting permissions...")
-                            .font(.title2)
-                    case .listening:
-                        Text("Listening...")
-                            .font(.title2)
-                            .foregroundColor(.red)
-                    case .processing:
-                        Text("Processing...")
-                            .font(.title2)
-                    case .success(let message):
-                        Text(message)
-                            .font(.title2)
-                            .foregroundColor(.green)
-                    case .error(let message):
-                        Text(message)
-                            .font(.title2)
-                            .foregroundColor(.red)
-                    }
-                }
-
-                // Recognized text
-                if !viewModel.recognizedText.isEmpty {
-                    Text(viewModel.recognizedText)
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding()
-                        .background(Color(.systemGray6))
-                        .cornerRadius(10)
-                        .padding(.horizontal)
-                }
-
-                Spacer()
-
-                // Action button
-                Group {
-                    switch viewModel.state {
-                    case .idle:
-                        Button(action: {
-                            viewModel.startRecording()
-                        }) {
-                            Text("Start Recording")
-                                .font(.headline)
-                                .padding()
-                                .frame(maxWidth: .infinity)
-                                .background(Color.accentColor)
-                                .foregroundColor(.white)
-                                .cornerRadius(10)
-                        }
-                    case .listening:
-                        Button(action: {
-                            viewModel.stopRecording()
-                        }) {
-                            Text("Stop Recording")
-                                .font(.headline)
-                                .padding()
-                                .frame(maxWidth: .infinity)
-                                .background(Color.red)
-                                .foregroundColor(.white)
-                                .cornerRadius(10)
-                        }
-                    case .processing:
-                        ProgressView()
-                    case .success, .error:
-                        Button(action: {
-                            dismiss()
-                        }) {
-                            Text("Done")
-                                .font(.headline)
-                                .padding()
-                                .frame(maxWidth: .infinity)
-                                .background(Color.accentColor)
-                                .foregroundColor(.white)
-                                .cornerRadius(10)
-                        }
-                    default:
-                        EmptyView()
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.bottom)
-            }
-            .navigationTitle("Voice Input")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        viewModel.stopRecording()
-                        dismiss()
-                    }
-                }
-            }
-            .onChange(of: viewModel.state) { oldState, newState in
-                if case .processing = newState {
-                    processVoiceInput()
-                }
-            }
-        }
-    }
-
-    private func processVoiceInput() {
-        guard let parsed = VoiceInputParser.parse(viewModel.recognizedText) else {
-            viewModel.state = .error("Could not understand. Try saying: '200g chicken breast for lunch'")
-            return
-        }
-
-        // Convert to grams if needed
-        var servingSize = parsed.amount
-        switch parsed.unit {
-        case "kg": servingSize *= 1000
-        case "ml": servingSize *= 1.0 // Assume 1ml = 1g for simplicity
-        case "oz": servingSize *= 28.35
-        case "cups": servingSize *= 240
-        case "tbsp": servingSize *= 15
-        case "tsp": servingSize *= 5
-        default: break
-        }
-
-        // Use the meal category from voice input if provided, otherwise use selected
-        let mealCategory = parsed.mealCategory ?? selectedMealCategory
-
-        // Look up the food in generic foods first
-        if let genericFood = GenericFood.seedData.first(where: {
-            $0.name.lowercased().contains(parsed.foodName.lowercased()) ||
-            parsed.foodName.lowercased().contains($0.name.lowercased())
-        }) {
-            // Log the food
-            let factor = servingSize / 100.0
-            let foodLog = FoodLog(
-                timestamp: Date(),
-                foodName: genericFood.name,
-                servingSize: servingSize,
-                calories: Int((genericFood.kcalPer100g * factor).rounded()),
-                protein: genericFood.proteinPer100g * factor,
-                carbs: genericFood.carbsPer100g * factor,
-                fats: genericFood.fatPer100g * factor,
-                category: mealCategory,
-                isFavorite: false,
-                sourceType: "voice",
-                sourceId: genericFood.id
-            )
-
-            modelContext.insert(foodLog)
-            try? modelContext.save()
-            AchievementManager.shared.evaluateAfterPersistingLog(foodLog, context: modelContext)
-
-            viewModel.state = .success("Added \(Int(servingSize))g \(genericFood.name) to \(mealCategory.rawValue)")
-            onFoodLogged()
-
-            // Auto-dismiss after 2 seconds
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                dismiss()
-            }
-        } else {
-            viewModel.state = .error("Food '\(parsed.foodName)' not found. Try scanning the barcode or adding manually.")
-        }
-    }
-}
-
-// 3.8 FoodScanViewModel.swift
+// 3.7 FoodScanViewModel.swift
 
 @MainActor
 public final class FoodScanViewModel: ObservableObject {
@@ -1420,24 +1444,6 @@ class NutritionManager {
     }
     
     @MainActor
-    func applyMealBudgets(profile: UserProfile, breakfast: Double, lunch: Double, dinner: Double, snack: Double) {
-        let total = max(0.01, breakfast + lunch + dinner + snack)
-        profile.mealBudgetBreakfast = breakfast / total
-        profile.mealBudgetLunch = lunch / total
-        profile.mealBudgetDinner = dinner / total
-        profile.mealBudgetSnack = snack / total
-    }
-    
-    func currentBudgets(for profile: UserProfile) -> (breakfast: Double, lunch: Double, dinner: Double, snack: Double) {
-        (
-            breakfast: profile.mealBudgetBreakfast,
-            lunch: profile.mealBudgetLunch,
-            dinner: profile.mealBudgetDinner,
-            snack: profile.mealBudgetSnack
-        )
-    }
-    
-    @MainActor
     func calculateCaloricTarget(profile: UserProfile) -> Int {
         let tdee = Double(calculateTDEE(profile: profile))
         let kcalPerKg = 7700.0
@@ -1483,166 +1489,425 @@ class NutritionManager {
         }
     }
     
-    /// Calculate target macros for a specific meal
-    @MainActor
-    func getMealTarget(meal: MealCategory, profile: UserProfile) -> (kcal: Int, protein: Double, carbs: Double) {
-        let dailyKcal = calculateCaloricTarget(profile: profile)
-        let dailyProtein = Double(profile.proteinGoal)
-        let percentage = profile.getBudgetPercentage(for: meal)
-        
-        // Estimate carbs from remaining calories (after protein/fat allocation)
-        let proteinCals = dailyProtein * 4.0
-        let estimatedFatCals = Double(dailyKcal) * 0.25  // ~25% from fat
-        let carbCals = Double(dailyKcal) - proteinCals - estimatedFatCals
-        let dailyCarbs = max(0, carbCals / 4.0)
-        
-        return (
-            Int(Double(dailyKcal) * percentage),
-            dailyProtein * percentage,
-            dailyCarbs * percentage
-        )
+    // MARK: - Weekly Summary
+    
+    struct WeeklySummaryData {
+        let averageCalories: Int
+        let averageProtein: Double
+        let averageCarbs: Double
+        let averageFats: Double
+        let proteinAdherencePercent: Double
+        let daysLogged: Int
     }
     
-    /// Get macros logged for a specific meal on a date
     @MainActor
-    func getMealSummary(for date: Date, meal: MealCategory, context: ModelContext) -> (kcal: Int, protein: Double, carbs: Double, fats: Double) {
-        let start = Calendar.current.startOfDay(for: date)
-        guard let end = Calendar.current.date(byAdding: .day, value: 1, to: start) else {
-            return (0, 0, 0, 0)
-        }
+    func getWeeklySummary(profile: UserProfile, context: ModelContext) -> WeeklySummaryData? {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        guard let weekAgo = calendar.date(byAdding: .day, value: -7, to: today) else { return nil }
+        
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: today)!
         
         let predicate = #Predicate<FoodLog> { log in
-            log.timestamp >= start && log.timestamp < end
+            log.timestamp >= weekAgo && log.timestamp < tomorrow
         }
         
         let descriptor = FetchDescriptor<FoodLog>(predicate: predicate)
         
         do {
             let logs = try context.fetch(descriptor)
-            let mealLogs = logs.filter { $0.category == meal }
+            guard !logs.isEmpty else { return nil }
             
-            let totalKcal = mealLogs.reduce(0) { $0 + $1.calories }
-            let totalProtein = mealLogs.reduce(0.0) { $0 + $1.protein }
-            let totalCarbs = mealLogs.reduce(0.0) { $0 + $1.carbs }
-            let totalFats = mealLogs.reduce(0.0) { $0 + $1.fats }
+            // Group logs by day
+            var dailyTotals: [Date: (kcal: Int, protein: Double, carbs: Double, fats: Double)] = [:]
             
-            return (totalKcal, totalProtein, totalCarbs, totalFats)
+            for log in logs {
+                let day = calendar.startOfDay(for: log.timestamp)
+                let current = dailyTotals[day] ?? (0, 0, 0, 0)
+                dailyTotals[day] = (
+                    current.kcal + log.calories,
+                    current.protein + log.protein,
+                    current.carbs + log.carbs,
+                    current.fats + log.fats
+                )
+            }
+            
+            let daysLogged = dailyTotals.count
+            guard daysLogged > 0 else { return nil }
+            
+            let totalKcal = dailyTotals.values.reduce(0) { $0 + $1.kcal }
+            let totalProtein = dailyTotals.values.reduce(0.0) { $0 + $1.protein }
+            let totalCarbs = dailyTotals.values.reduce(0.0) { $0 + $1.carbs }
+            let totalFats = dailyTotals.values.reduce(0.0) { $0 + $1.fats }
+            
+            // Calculate protein adherence (days meeting protein goal)
+            let proteinGoal = Double(profile.proteinGoal)
+            let daysMeetingProtein = dailyTotals.values.filter { $0.protein >= proteinGoal }.count
+            let adherencePercent = (Double(daysMeetingProtein) / 7.0) * 100.0
+            
+            return WeeklySummaryData(
+                averageCalories: totalKcal / daysLogged,
+                averageProtein: totalProtein / Double(daysLogged),
+                averageCarbs: totalCarbs / Double(daysLogged),
+                averageFats: totalFats / Double(daysLogged),
+                proteinAdherencePercent: adherencePercent,
+                daysLogged: daysLogged
+            )
         } catch {
-            print("Error fetching meal logs: \(error)")
-            return (0, 0, 0, 0)
+            print("Error fetching weekly summary: \(error)")
+            return nil
         }
     }
     
-    /// Get remaining macros for the entire day
+    // MARK: - Trend Analysis
+    
+    struct TrendInsight: Identifiable {
+        let id = UUID()
+        let message: String
+        let trend: TrendDirection
+        let icon: String
+    }
+    
+    enum TrendDirection {
+        case up, down, neutral
+        
+        var color: Color {
+            switch self {
+            case .up: return .green
+            case .down: return .red
+            case .neutral: return .gray
+            }
+        }
+    }
+    
     @MainActor
-    func getRemainingMacros(for date: Date, profile: UserProfile, context: ModelContext) -> (kcal: Int, protein: Double, carbs: Double) {
-        let target = (
-            kcal: calculateCaloricTarget(profile: profile),
-            protein: Double(profile.proteinGoal),
-            carbs: Double(profile.proteinGoal) * 2  // rough estimate
-        )
+    func getTrendAnalysis(profile: UserProfile, context: ModelContext) -> [TrendInsight] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
         
-        let consumed = getDailySummary(for: date, context: context) ?? (0, 0, 0, 0)
+        guard let thisWeekStart = calendar.date(byAdding: .day, value: -7, to: today),
+              let lastWeekStart = calendar.date(byAdding: .day, value: -14, to: today) else { return [] }
         
-        return (
-            max(0, target.kcal - consumed.kcal),
-            max(0, target.protein - consumed.protein),
-            max(0, target.carbs - consumed.carbs)
-        )
+        // Fetch this week's logs
+        let thisWeekPredicate = #Predicate<FoodLog> { log in
+            log.timestamp >= thisWeekStart && log.timestamp < today
+        }
+        let thisWeekDescriptor = FetchDescriptor<FoodLog>(predicate: thisWeekPredicate)
+        
+        // Fetch last week's logs
+        let lastWeekPredicate = #Predicate<FoodLog> { log in
+            log.timestamp >= lastWeekStart && log.timestamp < thisWeekStart
+        }
+        let lastWeekDescriptor = FetchDescriptor<FoodLog>(predicate: lastWeekPredicate)
+        
+        do {
+            let thisWeekLogs = try context.fetch(thisWeekDescriptor)
+            let lastWeekLogs = try context.fetch(lastWeekDescriptor)
+            
+            var insights: [TrendInsight] = []
+            
+            // Calculate weekly averages
+            let thisWeekProtein = thisWeekLogs.reduce(0.0) { $0 + $1.protein }
+            let lastWeekProtein = lastWeekLogs.reduce(0.0) { $0 + $1.protein }
+            
+            let thisWeekCalories = thisWeekLogs.reduce(0) { $0 + $1.calories }
+            let lastWeekCalories = lastWeekLogs.reduce(0) { $0 + $1.calories }
+            
+            // Protein trend
+            if lastWeekProtein > 0 {
+                let proteinChange = ((thisWeekProtein - lastWeekProtein) / lastWeekProtein) * 100
+                if abs(proteinChange) >= 5 {
+                    let direction: TrendDirection = proteinChange > 0 ? .up : .down
+                    let verb = proteinChange > 0 ? "improved" : "decreased"
+                    insights.append(TrendInsight(
+                        message: "Your protein intake \(verb) \(Int(abs(proteinChange)))% this week",
+                        trend: direction,
+                        icon: proteinChange > 0 ? "arrow.up.right.circle.fill" : "arrow.down.right.circle.fill"
+                    ))
+                }
+            }
+            
+            // Calorie consistency
+            if lastWeekCalories > 0 {
+                let calorieChange = ((Double(thisWeekCalories) - Double(lastWeekCalories)) / Double(lastWeekCalories)) * 100
+                if abs(calorieChange) < 10 {
+                    insights.append(TrendInsight(
+                        message: "Great calorie consistency! Staying within 10% of last week",
+                        trend: .neutral,
+                        icon: "checkmark.circle.fill"
+                    ))
+                } else if calorieChange > 10 {
+                    insights.append(TrendInsight(
+                        message: "Calorie intake up \(Int(calorieChange))% from last week",
+                        trend: .up,
+                        icon: "flame.fill"
+                    ))
+                }
+            }
+            
+            // Logging consistency
+            let thisWeekDays = Set(thisWeekLogs.map { calendar.startOfDay(for: $0.timestamp) }).count
+            if thisWeekDays >= 6 {
+                insights.append(TrendInsight(
+                    message: "Excellent tracking! You logged \(thisWeekDays) of 7 days",
+                    trend: .up,
+                    icon: "star.fill"
+                ))
+            } else if thisWeekDays >= 4 {
+                insights.append(TrendInsight(
+                    message: "Good effort! \(thisWeekDays) days logged this week",
+                    trend: .neutral,
+                    icon: "hand.thumbsup.fill"
+                ))
+            } else if thisWeekDays > 0 {
+                insights.append(TrendInsight(
+                    message: "Try to log more consistently - only \(thisWeekDays) days tracked",
+                    trend: .down,
+                    icon: "exclamationmark.triangle.fill"
+                ))
+            }
+            
+            // Empty state
+            if insights.isEmpty && thisWeekLogs.isEmpty {
+                insights.append(TrendInsight(
+                    message: "Start logging to see your trends!",
+                    trend: .neutral,
+                    icon: "chart.line.uptrend.xyaxis"
+                ))
+            }
+            
+            return insights
+        } catch {
+            print("Error fetching trend analysis: \(error)")
+            return []
+        }
+    }
+    
+    // MARK: - Weight vs Nutrition Correlation
+    
+    struct WeightNutritionCorrelation {
+        let weightChange: Double  // in kg
+        let avgDailyCalories: Int
+        let avgDailyDeficit: Int  // positive = deficit, negative = surplus
+        let expectedWeightChange: Double  // based on calories
+        let daysAnalyzed: Int
+        let correlation: CorrelationType
+    }
+    
+    enum CorrelationType: String {
+        case onTrack = "On Track"
+        case aheadOfPlan = "Ahead of Plan"
+        case behindPlan = "Behind Plan"
+        case noData = "Insufficient Data"
+        
+        var color: Color {
+            switch self {
+            case .onTrack: return .green
+            case .aheadOfPlan: return .blue
+            case .behindPlan: return .orange
+            case .noData: return .gray
+            }
+        }
+        
+        var icon: String {
+            switch self {
+            case .onTrack: return "checkmark.circle.fill"
+            case .aheadOfPlan: return "arrow.up.circle.fill"
+            case .behindPlan: return "arrow.down.circle.fill"
+            case .noData: return "questionmark.circle.fill"
+            }
+        }
+    }
+    
+    @MainActor
+    func getWeightNutritionCorrelation(profile: UserProfile, weightLogs: [WeightLog], context: ModelContext) -> WeightNutritionCorrelation? {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        guard let twoWeeksAgo = calendar.date(byAdding: .day, value: -14, to: today) else { return nil }
+        
+        // Get weight change over 2 weeks
+        let recentWeights = weightLogs
+            .filter { $0.date >= twoWeeksAgo }
+            .sorted { $0.date < $1.date }
+        
+        guard recentWeights.count >= 2 else { return nil }
+        
+        let startWeight = recentWeights.first!.weight
+        let endWeight = recentWeights.last!.weight
+        let weightChange = endWeight - startWeight
+        
+        // Get food logs for the same period
+        let predicate = #Predicate<FoodLog> { log in
+            log.timestamp >= twoWeeksAgo && log.timestamp < today
+        }
+        let descriptor = FetchDescriptor<FoodLog>(predicate: predicate)
+        
+        do {
+            let logs = try context.fetch(descriptor)
+            guard !logs.isEmpty else { return nil }
+            
+            // Group by day and calculate daily totals
+            var dailyCalories: [Date: Int] = [:]
+            for log in logs {
+                let day = calendar.startOfDay(for: log.timestamp)
+                dailyCalories[day, default: 0] += log.calories
+            }
+            
+            let daysLogged = dailyCalories.count
+            guard daysLogged >= 3 else { return nil }
+            
+            let totalCalories = dailyCalories.values.reduce(0, +)
+            let avgDailyCalories = totalCalories / daysLogged
+            
+            // Calculate TDEE and deficit/surplus
+            let tdee = calculateTDEE(profile: profile)
+            let avgDailyDeficit = tdee - avgDailyCalories
+            
+            // Expected weight change: 7700 kcal ≈ 1kg
+            // Over the logged days, what should the weight change be?
+            let totalDeficit = avgDailyDeficit * daysLogged
+            let expectedWeightChange = Double(totalDeficit) / 7700.0 * -1  // negative deficit = weight loss
+            
+            // Determine correlation type
+            let correlation: CorrelationType
+            let actualVsExpected = weightChange - expectedWeightChange
+            
+            if abs(actualVsExpected) < 0.3 {
+                correlation = .onTrack
+            } else if weightChange < expectedWeightChange {
+                correlation = .aheadOfPlan  // Lost more than expected
+            } else {
+                correlation = .behindPlan  // Lost less than expected
+            }
+            
+            return WeightNutritionCorrelation(
+                weightChange: weightChange,
+                avgDailyCalories: avgDailyCalories,
+                avgDailyDeficit: avgDailyDeficit,
+                expectedWeightChange: expectedWeightChange,
+                daysAnalyzed: daysLogged,
+                correlation: correlation
+            )
+        } catch {
+            print("Error calculating weight-nutrition correlation: \(error)")
+            return nil
+        }
+    }
+    
+    // MARK: - Streak Tracking
+    
+    struct StreakData {
+        let currentStreak: Int
+        let longestStreak: Int
+        let totalDaysLogged: Int
+        let lastLogDate: Date?
+    }
+    
+    @MainActor
+    func getStreakData(context: ModelContext) -> StreakData {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        
+        // Get all food logs
+        let descriptor = FetchDescriptor<FoodLog>(sortBy: [SortDescriptor(\.timestamp, order: .reverse)])
+        
+        do {
+            let logs = try context.fetch(descriptor)
+            guard !logs.isEmpty else {
+                return StreakData(currentStreak: 0, longestStreak: 0, totalDaysLogged: 0, lastLogDate: nil)
+            }
+            
+            // Get unique days
+            let loggedDays = Set(logs.map { calendar.startOfDay(for: $0.timestamp) }).sorted(by: >)
+            let totalDays = loggedDays.count
+            let lastLogDate = loggedDays.first
+            
+            // Calculate current streak (consecutive days ending today or yesterday)
+            var currentStreak = 0
+            var checkDate = today
+            
+            for day in loggedDays {
+                if day == checkDate || day == calendar.date(byAdding: .day, value: -1, to: checkDate) {
+                    currentStreak += 1
+                    checkDate = day
+                } else if day < calendar.date(byAdding: .day, value: -1, to: checkDate)! {
+                    break
+                }
+            }
+            
+            // Calculate longest streak
+            var longestStreak = 0
+            var tempStreak = 1
+            let sortedDays = loggedDays.sorted()
+            
+            for i in 1..<sortedDays.count {
+                let prevDay = sortedDays[i - 1]
+                let currentDay = sortedDays[i]
+                
+                if let nextDay = calendar.date(byAdding: .day, value: 1, to: prevDay), nextDay == currentDay {
+                    tempStreak += 1
+                } else {
+                    longestStreak = max(longestStreak, tempStreak)
+                    tempStreak = 1
+                }
+            }
+            longestStreak = max(longestStreak, tempStreak)
+            
+            return StreakData(
+                currentStreak: currentStreak,
+                longestStreak: longestStreak,
+                totalDaysLogged: totalDays,
+                lastLogDate: lastLogDate
+            )
+        } catch {
+            print("Error fetching streak data: \(error)")
+            return StreakData(currentStreak: 0, longestStreak: 0, totalDaysLogged: 0, lastLogDate: nil)
+        }
+    }
+    
+    // MARK: - Weekly Progress Data (for chart)
+    
+    struct WeeklyProgressPoint: Identifiable {
+        let id = UUID()
+        let date: Date
+        let calories: Int
+        let weight: Double?
+    }
+    
+    @MainActor
+    func getWeeklyProgressData(weightLogs: [WeightLog], context: ModelContext) -> [WeeklyProgressPoint] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        
+        var points: [WeeklyProgressPoint] = []
+        
+        for dayOffset in (0..<7).reversed() {
+            guard let date = calendar.date(byAdding: .day, value: -dayOffset, to: today) else { continue }
+            let nextDay = calendar.date(byAdding: .day, value: 1, to: date)!
+            
+            // Get calories for this day
+            let predicate = #Predicate<FoodLog> { log in
+                log.timestamp >= date && log.timestamp < nextDay
+            }
+            let descriptor = FetchDescriptor<FoodLog>(predicate: predicate)
+            
+            do {
+                let logs = try context.fetch(descriptor)
+                let dailyCalories = logs.reduce(0) { $0 + $1.calories }
+                
+                // Get weight for this day if available
+                let weight = weightLogs.first { calendar.isDate($0.date, inSameDayAs: date) }?.weight
+                
+                points.append(WeeklyProgressPoint(date: date, calories: dailyCalories, weight: weight))
+            } catch {
+                points.append(WeeklyProgressPoint(date: date, calories: 0, weight: nil))
+            }
+        }
+        
+        return points
     }
 }
 
-@Observable
-class AchievementManager {
-    static let shared = AchievementManager()
-    private init() {}
-    
-    private let badgeCatalog: [BadgeType: (title: String, detail: String, icon: String)] = [
-        .firstLog: ("First Log", "Logged your first meal", "1.circle.fill"),
-        .streak3: ("3-Day Streak", "Logged meals three days in a row", "flame.fill"),
-        .streak7: ("7-Day Streak", "An entire week of consistency", "flame.circle.fill"),
-        .proteinGoal: ("Protein Hit", "Met your daily protein goal", "bolt.heart.fill"),
-        .recipeCreator: ("Recipe Creator", "Built your first recipe", "fork.knife")
-    ]
-    
-    @MainActor
-    func earnedBadges(context: ModelContext) -> [AchievementBadge] {
-        let descriptor = FetchDescriptor<AchievementBadge>(sortBy: [SortDescriptor(\.unlockedAt, order: .reverse)])
-        return (try? context.fetch(descriptor)) ?? []
-    }
-    
-    @MainActor
-    func award(_ type: BadgeType, context: ModelContext) {
-        guard badgeCatalog[type] != nil else { return }
-        if hasBadge(type, context: context) { return }
-        let meta = badgeCatalog[type]!
-        let badge = AchievementBadge(type: type, title: meta.title, detail: meta.detail, icon: meta.icon)
-        context.insert(badge)
-        try? context.save()
-    }
-    
-    @MainActor
-    func hasBadge(_ type: BadgeType, context: ModelContext) -> Bool {
-        let descriptor = FetchDescriptor<AchievementBadge>(predicate: #Predicate { $0.type == type })
-        let count = (try? context.fetch(descriptor).count) ?? 0
-        return count > 0
-    }
-    
-    @MainActor
-    func evaluateAfterLogging(on date: Date, context: ModelContext, profile: UserProfile?) {
-        let totalLogs = (try? context.fetch(FetchDescriptor<FoodLog>()).count) ?? 0
-        if totalLogs == 1 {
-            award(.firstLog, context: context)
-        }
-        
-        let streak = currentStreak(context: context)
-        if streak >= 3 { award(.streak3, context: context) }
-        if streak >= 7 { award(.streak7, context: context) }
-        
-        if let profile = profile {
-            let summary = NutritionManager.shared.getDailySummary(for: date, context: context)
-            if let summary, summary.protein >= Double(profile.proteinGoal) {
-                award(.proteinGoal, context: context)
-            }
-        }
-    }
-    
-    @MainActor
-    func evaluateAfterPersistingLog(_ log: FoodLog, context: ModelContext) {
-        let descriptor = FetchDescriptor<UserProfile>()
-        let profile = try? context.fetch(descriptor).first
-        evaluateAfterLogging(on: log.timestamp, context: context, profile: profile ?? nil)
-    }
-    
-    @MainActor
-    func evaluateAfterRecipeCreated(context: ModelContext) {
-        award(.recipeCreator, context: context)
-    }
-    
-    private func currentStreak(context: ModelContext) -> Int {
-        let descriptor = FetchDescriptor<FoodLog>(sortBy: [SortDescriptor(\.timestamp, order: .reverse)])
-        guard let logs = try? context.fetch(descriptor), !logs.isEmpty else { return 0 }
-        
-        let calendar = Calendar.current
-        let uniqueDays = Array(Set(logs.map { calendar.startOfDay(for: $0.timestamp) })).sorted(by: >)
-        
-        var streak = 0
-        var cursor = calendar.startOfDay(for: Date())
-        
-        for day in uniqueDays {
-            if day == cursor {
-                streak += 1
-                if let previous = calendar.date(byAdding: .day, value: -1, to: cursor) {
-                    cursor = previous
-                }
-            } else if day < cursor {
-                break
-            }
-        }
-        
-        return streak
-    }
-}
 
 // MARK: - 5) Camera Permission Helper (for scan UX)
 
@@ -1681,17 +1946,21 @@ struct ContentView: View {
     
     var body: some View {
         TabView(selection: $selectedTab) {
-            DashboardView()
+            DashboardView(selectedTab: $selectedTab)
                 .tabItem { Label("Dashboard", systemImage: "house.fill") }
                 .tag(0)
             
-            Text("Workout (next)") // training UI can be added later
-                .tabItem { Label("Workout", systemImage: "figure.strengthtraining.functional") }
+            WorkoutDashboardView()
+                .tabItem { Label("Lift", systemImage: "dumbbell.fill") }
                 .tag(1)
             
             FoodLogView()
                 .tabItem { Label("Nutrition", systemImage: "fork.knife.circle.fill") }
                 .tag(2)
+            
+            InsightsView()
+                .tabItem { Label("Insights", systemImage: "chart.bar.fill") }
+                .tag(3)
         }
     }
 }
@@ -1703,354 +1972,29 @@ struct DailySummaryCard: View {
     var summary: (kcal: Int, protein: Double, carbs: Double, fats: Double)?
     
     var caloricTarget: Int { NutritionManager.shared.calculateCaloricTarget(profile: profile) }
+    private var today: Date { Date() }
+    
+    private var weekdayString: String {
+        today.formatted(.dateTime.weekday(.wide))
+    }
     
     var body: some View {
         let remaining = max(0, caloricTarget - (summary?.kcal ?? 0))
-        let proteinRemaining = max(0, profile.proteinGoal - Int(summary?.protein ?? 0))
+        let consumedCalories = summary?.kcal ?? 0
+        let progress = caloricTarget > 0 ? Double(consumedCalories) / Double(caloricTarget) : 0
+        let clampedProgress = min(max(progress, 0), 1)
         
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Nutrition Goal: \(caloricTarget) kcal")
-                .font(.headline)
-            
-            HStack {
-                VStack {
-                    Text("\(remaining)")
-                        .font(.largeTitle).bold()
-                        .foregroundColor(remaining < caloricTarget / 5 ? .red : .green)
-                    Text("Calories Left")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                
-                VStack {
-                    Text("\(proteinRemaining)g")
-                        .font(.largeTitle).bold()
-                        .foregroundColor(proteinRemaining <= 0 ? .green : .orange)
-                    Text("Protein Left")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .padding(.vertical, 10)
-            
-            Divider()
-            
-            VStack(spacing: 5) {
-                MacroProgressView(label: "Protein", current: summary?.protein ?? 0, goal: Double(profile.proteinGoal))
-                let fatCals = (summary?.fats ?? 0) * 9
-                let proteinCals = Double(profile.proteinGoal) * 4
-                let remainingForCarbs = max(0.0, Double(caloricTarget) - proteinCals - fatCals)
-                MacroProgressView(label: "Carbs", current: summary?.carbs ?? 0, goal: remainingForCarbs / 4.0)
-            }
-        }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(radius: 5)
-    }
-}
-
-struct MacroProgressView: View {
-    let label: String
-    let current: Double
-    let goal: Double
-    
-    var progress: Double { goal > 0 ? min(current / goal, 1.0) : 0 }
-    
-    var body: some View {
-        HStack {
-            Text(label)
-                .font(.caption)
-                .frame(width: 60, alignment: .leading)
-            ProgressView(value: progress)
-            Text("\(Int(current))/\(Int(goal))g")
-                .font(.caption)
-                .frame(width: 85, alignment: .trailing)
-        }
-    }
-}
-
-// MARK: - Remaining Macros UI Components
-
-/// Floating bar showing remaining daily macros
-struct RemainingMacrosBar: View {
-    let remainingKcal: Int
-    let remainingProtein: Double
-    let remainingCarbs: Double
-    let targetKcal: Int
-    
-    private var kcalPercentUsed: Double {
-        guard targetKcal > 0 else { return 0 }
-        return 1.0 - (Double(remainingKcal) / Double(targetKcal))
-    }
-    
-    private var statusColor: Color {
-        if kcalPercentUsed > 1.0 { return .red }
-        if kcalPercentUsed > 0.8 { return .orange }
-        return .green
-    }
-    
-    var body: some View {
-        HStack(spacing: 16) {
-            HStack(spacing: 4) {
-                Image(systemName: "flame.fill")
-                    .foregroundColor(statusColor)
-                Text("\(remainingKcal)")
-                    .font(.headline).bold()
-                Text("kcal")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Divider().frame(height: 20)
-            
-            HStack(spacing: 4) {
-                Text("🥩")
-                Text("\(Int(remainingProtein))g")
-                    .font(.headline).bold()
-                Text("protein")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Divider().frame(height: 20)
-            
-            HStack(spacing: 4) {
-                Text("🍚")
-                Text("\(Int(remainingCarbs))g")
-                    .font(.headline).bold()
-                Text("carbs")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(.ultraThinMaterial)
-        .cornerRadius(12)
-        .shadow(radius: 3)
-    }
-}
-
-/// Card showing remaining macros for a specific meal
-struct MealBudgetCard: View {
-    let meal: MealCategory
-    let consumed: (kcal: Int, protein: Double, carbs: Double, fats: Double)
-    let target: (kcal: Int, protein: Double, carbs: Double)
-    
-    private var percentUsed: Double {
-        guard target.kcal > 0 else { return 0 }
-        return Double(consumed.kcal) / Double(target.kcal)
-    }
-    
-    private var statusColor: Color {
-        if percentUsed > 1.0 { return .red }
-        if percentUsed > 0.8 { return .orange }
-        return .green
-    }
-    
-    private var remainingKcal: Int { max(0, target.kcal - consumed.kcal) }
-    private var remainingProtein: Double { max(0, target.protein - consumed.protein) }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("\(meal.rawValue.capitalized) Budget")
-                    .font(.subheadline).bold()
-                Spacer()
-                Text("\(Int(percentUsed * 100))% used")
-                    .font(.caption)
-                    .foregroundColor(statusColor)
-            }
-            
-            ProgressView(value: min(percentUsed, 1.0))
-                .tint(statusColor)
-            
-            HStack {
-                VStack(alignment: .leading) {
-                    Text("\(remainingKcal) kcal left")
-                        .font(.caption)
-                    Text("\(Int(remainingProtein))g protein left")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                Spacer()
-                if remainingKcal > 0 {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                } else {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
-                }
-            }
-        }
-        .padding()
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(10)
-    }
-}
-
-// MARK: - Generic Foods Sheet
-
-struct GenericFoodsSheet: View {
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
-    
-    let selectedMealCategory: MealCategory
-    let onLogged: () -> Void
-    
-    @State private var searchText = ""
-    @State private var selectedCategory: FoodCategory? = nil
-    @State private var selectedFood: GenericFood? = nil
-    
-    private var filteredFoods: [GenericFood] {
-        var foods = GenericFood.seedData
-        if let category = selectedCategory {
-            foods = foods.filter { $0.category == category }
-        }
-        if !searchText.isEmpty {
-            foods = foods.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
-        }
-        return foods.sorted { $0.name < $1.name }
-    }
-    
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        CategoryPill(title: "All", isSelected: selectedCategory == nil) {
-                            selectedCategory = nil
-                        }
-                        ForEach(FoodCategory.allCases, id: \.self) { cat in
-                            CategoryPill(title: cat.rawValue, isSelected: selectedCategory == cat) {
-                                selectedCategory = cat
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
-                }
-                .padding(.vertical, 8)
-                
-                List(filteredFoods, id: \.id) { food in
-                    Button {
-                        selectedFood = food
-                    } label: {
-                        GenericFoodRow(food: food)
-                    }
-                }
-            }
-            .searchable(text: $searchText, prompt: "Search ingredients...")
-            .navigationTitle("Generic Ingredients")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
-                }
-            }
-            .sheet(item: $selectedFood) { food in
-                GenericFoodLogSheet(food: food, category: selectedMealCategory) { entry in
-                    modelContext.insert(entry)
-                    try? modelContext.save()
-                    AchievementManager.shared.evaluateAfterPersistingLog(entry, context: modelContext)
-                    onLogged()
-                    dismiss()
-                }
-            }
-        }
-    }
-}
-
-struct CategoryPill: View {
-    let title: String
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(isSelected ? Color.accentColor : Color(.systemGray5))
-                .foregroundColor(isSelected ? .white : .primary)
-                .cornerRadius(16)
-        }
-    }
-}
-
-struct GenericFoodRow: View {
-    let food: GenericFood
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(food.name).font(.headline).foregroundColor(.primary)
-            HStack {
-                Text("\(Int(food.kcalPer100g)) kcal")
-                Text("P:\(Int(food.proteinPer100g)) C:\(Int(food.carbsPer100g)) F:\(Int(food.fatPer100g))")
-            }
-            .font(.caption).foregroundColor(.secondary)
-        }
-    }
-}
-
-struct GenericFoodLogSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    let food: GenericFood
-    let category: MealCategory
-    let onLog: (FoodLog) -> Void
-    
-    @State private var servingSize: Double
-    
-    init(food: GenericFood, category: MealCategory, onLog: @escaping (FoodLog) -> Void) {
-        self.food = food
-        self.category = category
-        self.onLog = onLog
-        _servingSize = State(initialValue: food.typicalServingG)
-    }
-    
-    private var factor: Double { servingSize / 100.0 }
-    private var kcal: Int { Int((food.kcalPer100g * factor).rounded()) }
-    private var protein: Double { food.proteinPer100g * factor }
-    private var carbs: Double { food.carbsPer100g * factor }
-    private var fats: Double { food.fatPer100g * factor }
-    
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Serving") {
-                    Text("\(Int(servingSize))g").font(.title).bold()
-                    Slider(value: $servingSize, in: 10...500, step: 5)
-                    HStack {
-                        ForEach([50, 100, Int(food.typicalServingG), 200], id: \.self) { g in
-                            Button("\(g)g") { servingSize = Double(g) }.buttonStyle(.bordered)
-                        }
-                    }
-                }
-                Section("Macros") {
-                    HStack {
-                        VStack { Text("\(kcal)").bold(); Text("kcal").font(.caption) }
-                        Spacer()
-                        VStack { Text(String(format: "%.0f", protein)).bold(); Text("P").font(.caption) }
-                        Spacer()
-                        VStack { Text(String(format: "%.0f", carbs)).bold(); Text("C").font(.caption) }
-                        Spacer()
-                        VStack { Text(String(format: "%.0f", fats)).bold(); Text("F").font(.caption) }
-                    }
-                }
-            }
-            .navigationTitle(food.name)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Add") {
-                        onLog(FoodLog(foodName: food.name, servingSize: servingSize, calories: kcal, protein: protein, carbs: carbs, fats: fats, category: category, sourceType: "generic", sourceId: food.id))
-                        dismiss()
-                    }.bold()
-                }
-            }
-        }
+        GlassCardView(
+            title: "Today",
+            subtitle: weekdayString,
+            caloriesLeft: remaining,
+            caloriesDetail: "\(consumedCalories) / \(caloricTarget) kcal",
+            progress: clampedProgress,
+            macroItems: [
+                (label: "Protein", amount: "\(Int(summary?.protein ?? 0))g", color: .orange),
+                (label: "Fat", amount: "\(Int(summary?.fats ?? 0))g", color: .green)
+            ]
+        )
     }
 }
 
@@ -2118,18 +2062,50 @@ struct WeightTrendChart: View {
                 .font(.headline)
                 .padding(.leading)
             
-            Chart {
-                ForEach(weightLogs.sorted(by: { $0.date < $1.date }), id: \.date) { log in
-                    LineMark(
-                        x: .value("Date", log.date),
-                        y: .value("Weight", log.weight)
-                    )
-                    .symbol(.circle)
+            if weightLogs.count >= 2 {
+                Chart {
+                    ForEach(weightLogs.sorted(by: { $0.date < $1.date }), id: \.date) { log in
+                        LineMark(
+                            x: .value("Date", log.date),
+                            y: .value("Weight", log.weight)
+                        )
+                        .symbol(.circle)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .blue],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        
+                        PointMark(
+                            x: .value("Date", log.date),
+                            y: .value("Weight", log.weight)
+                        )
+                        .foregroundStyle(.purple)
+                    }
                 }
+                .chartYAxisLabel("Weight (kg)")
+                .chartXAxis(.hidden)
+                .padding(.top, 10)
+            } else {
+                VStack(spacing: 12) {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(.system(size: 40))
+                        .foregroundColor(.gray.opacity(0.5))
+                    
+                    Text("Track your weight progress")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    Text("Log at least 2 weigh-ins to see your trend chart")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 30)
             }
-            .chartYAxisLabel("Weight (kg)")
-            .chartXAxis(.hidden)
-            .padding(.top, 10)
         }
         .padding()
         .background(Color(.systemBackground))
@@ -2138,43 +2114,1086 @@ struct WeightTrendChart: View {
     }
 }
 
-struct DashboardView: View {
+// MARK: - Insights & Analytics Views
+
+struct WeeklySummaryCard: View {
+    let summary: NutritionManager.WeeklySummaryData?
+    let targetCalories: Int
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("📊 Weekly Summary")
+                    .font(.headline)
+                Spacer()
+                if let summary = summary {
+                    Text("\(summary.daysLogged)/7 days logged")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            if let summary = summary {
+                HStack(spacing: 20) {
+                    VStack(spacing: 4) {
+                        Text("\(summary.averageCalories)")
+                            .font(.title)
+                            .bold()
+                            .foregroundColor(.orange)
+                        Text("Avg Calories")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    
+                    Divider()
+                        .frame(height: 50)
+                    
+                    VStack(spacing: 4) {
+                        Text("\(Int(summary.proteinAdherencePercent))%")
+                            .font(.title)
+                            .bold()
+                            .foregroundColor(summary.proteinAdherencePercent >= 70 ? .green : .orange)
+                        Text("Protein Goal")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .padding(.vertical, 8)
+                
+                HStack {
+                    MacroLabel(name: "P", value: summary.averageProtein, color: .blue)
+                    MacroLabel(name: "C", value: summary.averageCarbs, color: .green)
+                    MacroLabel(name: "F", value: summary.averageFats, color: .orange)
+                }
+            } else {
+                Text("Log food for 7 days to see your weekly summary")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 20)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(radius: 5)
+    }
+}
+
+struct MacroLabel: View {
+    let name: String
+    let value: Double
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 2) {
+            Text(name)
+                .font(.caption2)
+                .bold()
+                .foregroundColor(color)
+            Text("\(Int(value))g")
+                .font(.caption)
+                .foregroundColor(.primary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+struct MacroPieChartView: View {
+    let protein: Double
+    let carbs: Double
+    let fats: Double
+    
+    var total: Double { protein + carbs + fats }
+    
+    var macroData: [(name: String, value: Double, color: Color)] {
+        [
+            ("Protein", protein, .blue),
+            ("Carbs", carbs, .green),
+            ("Fats", fats, .orange)
+        ]
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("🥧 Macro Distribution")
+                .font(.headline)
+            
+            if total > 0 {
+                HStack(spacing: 20) {
+                    Chart(macroData, id: \.name) { item in
+                        SectorMark(
+                            angle: .value("Grams", item.value),
+                            innerRadius: .ratio(0.5),
+                            angularInset: 2
+                        )
+                        .foregroundStyle(item.color)
+                        .cornerRadius(4)
+                    }
+                    .frame(width: 120, height: 120)
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(macroData, id: \.name) { item in
+                            HStack(spacing: 8) {
+                                Circle()
+                                    .fill(item.color)
+                                    .frame(width: 12, height: 12)
+                                VStack(alignment: .leading) {
+                                    Text(item.name)
+                                        .font(.caption)
+                                        .bold()
+                                    Text("\(Int(item.value))g (\(Int((item.value / total) * 100))%)")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+            } else {
+                Text("No macro data available yet")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 20)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(radius: 5)
+    }
+}
+
+struct TrendAnalysisCard: View {
+    let insights: [NutritionManager.TrendInsight]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("📈 Trend Analysis")
+                .font(.headline)
+            
+            if insights.isEmpty {
+                Text("Keep logging to unlock trend insights!")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 20)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(insights) { insight in
+                        HStack(spacing: 12) {
+                            Image(systemName: insight.icon)
+                                .font(.title2)
+                                .foregroundColor(insight.trend.color)
+                                .frame(width: 32)
+                            
+                            Text(insight.message)
+                                .font(.subheadline)
+                                .foregroundColor(.primary)
+                            
+                            Spacer()
+                        }
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 10)
+                        .background(insight.trend.color.opacity(0.1))
+                        .cornerRadius(8)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(radius: 5)
+    }
+}
+
+struct InsightsView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var profile: UserProfile?
+    @State private var weeklySummary: NutritionManager.WeeklySummaryData?
+    @State private var trendInsights: [NutritionManager.TrendInsight] = []
+    @State private var todayMacros: (protein: Double, carbs: Double, fats: Double) = (0, 0, 0)
+    @State private var weightCorrelation: NutritionManager.WeightNutritionCorrelation?
+    @State private var streakData: NutritionManager.StreakData?
+    @State private var progressData: [NutritionManager.WeeklyProgressPoint] = []
+    @State private var todaySummary: (kcal: Int, protein: Double, carbs: Double, fats: Double)?
+    @Query private var confirmations: [DailyConfirmation]
+    
+    private var dayConfirmed: Bool {
+        let today = Calendar.current.startOfDay(for: Date())
+        return confirmations.contains { Calendar.current.isDate($0.date, inSameDayAs: today) && $0.isConfirmed }
+    }
+    
+    private func confirmDay() {
+        let confirmation = DailyConfirmation(date: Date())
+        modelContext.insert(confirmation)
+        try? modelContext.save()
+    }
     
     @Query(sort: \WeightLog.date, order: .reverse) private var weightLogs: [WeightLog]
-    @Query(sort: \WorkoutSession.startTime, order: .reverse) private var workouts: [WorkoutSession]
     
     private let nutritionManager = NutritionManager.shared
-    private let today = Date()
     
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    if let profile = profile {
-                        DailySummaryCard(profile: profile, summary: nutritionManager.getDailySummary(for: today, context: modelContext))
-                        
-                        WeightTrackingCard(
-                            currentWeight: profile.currentWeight,
-                            trendWeight: nutritionManager.calculateTrendWeight(logs: weightLogs)
-                        )
-                    } else {
-                        Text("Setting up User Profile…")
+                    // Daily Confirmation Card
+                    DailyConfirmationCard(
+                        todaySummary: todaySummary,
+                        profile: profile,
+                        isConfirmed: dayConfirmed,
+                        onConfirm: { confirmDay() }
+                    )
+                    
+                    // Streak Card
+                    if let streak = streakData {
+                        StreakCard(streakData: streak)
                     }
                     
-                    WeightTrendChart(weightLogs: weightLogs)
-                        .frame(height: 220)
-                        .padding(.horizontal)
+                    // Weekly Summary
+                    WeeklySummaryCard(
+                        summary: weeklySummary,
+                        targetCalories: profile.map { nutritionManager.calculateCaloricTarget(profile: $0) } ?? 2000
+                    )
+                    
+                    // Macro Pie Chart
+                    MacroPieChartView(
+                        protein: weeklySummary?.averageProtein ?? todayMacros.protein,
+                        carbs: weeklySummary?.averageCarbs ?? todayMacros.carbs,
+                        fats: weeklySummary?.averageFats ?? todayMacros.fats
+                    )
+                    
+                    // Weight vs Nutrition Correlation
+                    if let correlation = weightCorrelation {
+                        WeightNutritionCard(correlation: correlation)
+                    }
+                    
+                    // Weekly Progress Chart
+                    if !progressData.isEmpty {
+                        WeeklyProgressChart(
+                            data: progressData,
+                            targetCalories: profile.map { nutritionManager.calculateCaloricTarget(profile: $0) } ?? 2000
+                        )
+                    }
+                    
+                    // Trend Analysis
+                    TrendAnalysisCard(insights: trendInsights)
                 }
                 .padding()
             }
-            .navigationTitle("Today’s Fuel ⚡️")
+            .navigationTitle("Insights ⚡️")
+            .onAppear { loadData() }
+            .refreshable { loadData() }
+        }
+    }
+    
+    private func loadData() {
+        let profileDescriptor = FetchDescriptor<UserProfile>()
+        if let existingProfile = try? modelContext.fetch(profileDescriptor).first {
+            profile = existingProfile
+            weeklySummary = nutritionManager.getWeeklySummary(profile: existingProfile, context: modelContext)
+            trendInsights = nutritionManager.getTrendAnalysis(profile: existingProfile, context: modelContext)
+            weightCorrelation = nutritionManager.getWeightNutritionCorrelation(profile: existingProfile, weightLogs: weightLogs, context: modelContext)
+        }
+        
+        streakData = nutritionManager.getStreakData(context: modelContext)
+        progressData = nutritionManager.getWeeklyProgressData(weightLogs: weightLogs, context: modelContext)
+        
+        if let dailySummary = nutritionManager.getDailySummary(for: Date(), context: modelContext) {
+            todayMacros = (dailySummary.protein, dailySummary.carbs, dailySummary.fats)
+            todaySummary = dailySummary
+        }
+    }
+}
+
+// MARK: - Daily Confirmation Card
+
+struct DailyConfirmationCard: View {
+    let todaySummary: (kcal: Int, protein: Double, carbs: Double, fats: Double)?
+    let profile: UserProfile?
+    let isConfirmed: Bool
+    let onConfirm: () -> Void
+    
+    var targetCalories: Int {
+        profile.map { NutritionManager.shared.calculateCaloricTarget(profile: $0) } ?? 2000
+    }
+    
+    var proteinGoal: Int { profile?.proteinGoal ?? 150 }
+    
+    var encouragingMessage: String {
+        guard let summary = todaySummary else {
+            return "📝 Start logging your meals to track progress!"
+        }
+        
+        let caloriesDiff = summary.kcal - targetCalories
+        let proteinMet = summary.protein >= Double(proteinGoal)
+        
+        if isConfirmed {
+            return "✅ Day confirmed! Great job staying accountable!"
+        }
+        
+        // Under calories + hit protein = perfect
+        if caloriesDiff <= 0 && proteinMet {
+            return "🎯 Perfect day! Under calories AND hit protein goal!"
+        }
+        // Under calories but missed protein
+        else if caloriesDiff <= 0 && !proteinMet {
+            return "💪 Good calorie control! Try to get more protein tomorrow."
+        }
+        // Over calories but hit protein
+        else if caloriesDiff > 0 && caloriesDiff <= 200 && proteinMet {
+            return "👍 Solid effort! Just slightly over, great protein intake."
+        }
+        // Significantly over
+        else if caloriesDiff > 200 {
+            let overBy = caloriesDiff
+            return "📊 \(overBy) over target. Tomorrow's a new day—stay consistent!"
+        }
+        else {
+            return "🌟 Keep logging to see your progress!"
+        }
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("📅 Today's Summary")
+                    .font(.headline)
+                Spacer()
+                if isConfirmed {
+                    Image(systemName: "checkmark.seal.fill")
+                        .foregroundColor(.green)
+                }
+            }
+            
+            if let summary = todaySummary {
+                HStack(spacing: 15) {
+                    VStack {
+                        Text("\(summary.kcal)")
+                            .font(.title2).bold()
+                            .foregroundColor(summary.kcal <= targetCalories ? .green : .orange)
+                        Text("/ \(targetCalories)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("kcal")
+                            .font(.caption2)
+                    }
+                    
+                    Divider().frame(height: 40)
+                    
+                    VStack {
+                        Text("\(Int(summary.protein))g")
+                            .font(.title2).bold()
+                            .foregroundColor(summary.protein >= Double(proteinGoal) ? .green : .orange)
+                        Text("/ \(proteinGoal)g")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("protein")
+                            .font(.caption2)
+                    }
+                    
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
+            }
+            
+            Text(encouragingMessage)
+                .font(.subheadline)
+                .foregroundColor(.primary)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            
+            if todaySummary != nil && !isConfirmed {
+                Button(action: onConfirm) {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text("Confirm Today's Diary")
+                    }
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.green)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(radius: 5)
+    }
+}
+
+// MARK: - Streak Card
+
+struct StreakCard: View {
+    let streakData: NutritionManager.StreakData
+    
+    var body: some View {
+        HStack(spacing: 20) {
+            VStack(spacing: 4) {
+                Text("🔥")
+                    .font(.largeTitle)
+                Text("\(streakData.currentStreak)")
+                    .font(.title).bold()
+                    .foregroundColor(.orange)
+                Text("Current")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            
+            Divider().frame(height: 60)
+            
+            VStack(spacing: 4) {
+                Text("🏆")
+                    .font(.largeTitle)
+                Text("\(streakData.longestStreak)")
+                    .font(.title).bold()
+                    .foregroundColor(.yellow)
+                Text("Best")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            
+            Divider().frame(height: 60)
+            
+            VStack(spacing: 4) {
+                Text("📊")
+                    .font(.largeTitle)
+                Text("\(streakData.totalDaysLogged)")
+                    .font(.title).bold()
+                    .foregroundColor(.blue)
+                Text("Total Days")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(radius: 5)
+    }
+}
+
+// MARK: - Weight vs Nutrition Correlation Card
+
+struct WeightNutritionCard: View {
+    let correlation: NutritionManager.WeightNutritionCorrelation
+    
+    var weightChangeText: String {
+        let change = correlation.weightChange
+        if abs(change) < 0.1 {
+            return "No change"
+        } else if change < 0 {
+            return "\(String(format: "%.1f", abs(change)))kg lost"
+        } else {
+            return "\(String(format: "%.1f", change))kg gained"
+        }
+    }
+    
+    var deficitText: String {
+        if correlation.avgDailyDeficit > 0 {
+            return "\(correlation.avgDailyDeficit) cal deficit"
+        } else {
+            return "\(abs(correlation.avgDailyDeficit)) cal surplus"
+        }
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("⚖️ Weight vs Nutrition")
+                    .font(.headline)
+                Spacer()
+                HStack(spacing: 4) {
+                    Image(systemName: correlation.correlation.icon)
+                        .foregroundColor(correlation.correlation.color)
+                    Text(correlation.correlation.rawValue)
+                        .font(.caption)
+                        .foregroundColor(correlation.correlation.color)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(correlation.correlation.color.opacity(0.15))
+                .cornerRadius(8)
+            }
+            
+            HStack(spacing: 20) {
+                VStack(spacing: 4) {
+                    Text(weightChangeText)
+                        .font(.title3).bold()
+                        .foregroundColor(correlation.weightChange <= 0 ? .green : .orange)
+                    Text("Actual")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                
+                VStack(spacing: 4) {
+                    Text(deficitText)
+                        .font(.title3).bold()
+                        .foregroundColor(.blue)
+                    Text("Avg Daily")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+            }
+            
+            Text("Based on \(correlation.daysAnalyzed) days of data")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(radius: 5)
+    }
+}
+
+// MARK: - Weekly Progress Chart
+
+struct WeeklyProgressChart: View {
+    let data: [NutritionManager.WeeklyProgressPoint]
+    let targetCalories: Int
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("📈 Weekly Progress")
+                .font(.headline)
+            
+            Chart {
+                ForEach(data) { point in
+                    BarMark(
+                        x: .value("Day", point.date, unit: .day),
+                        y: .value("Calories", point.calories)
+                    )
+                    .foregroundStyle(point.calories <= targetCalories ? Color.green : Color.orange)
+                }
+                
+                RuleMark(y: .value("Target", targetCalories))
+                    .foregroundStyle(.red.opacity(0.7))
+                    .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 5]))
+            }
+            .frame(height: 150)
+            .chartYAxisLabel("Calories")
+            
+            HStack {
+                Circle().fill(.green).frame(width: 10, height: 10)
+                Text("Under target").font(.caption)
+                Circle().fill(.orange).frame(width: 10, height: 10)
+                Text("Over target").font(.caption)
+                Spacer()
+            }
+            .foregroundColor(.secondary)
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(radius: 5)
+    }
+}
+
+
+struct DashboardView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Binding var selectedTab: Int
+    @State private var profile: UserProfile?
+    
+    @Query(sort: \WeightLog.date, order: .reverse) private var weightLogs: [WeightLog]
+    @Query(sort: \WorkoutSession.startTime, order: .reverse) private var workouts: [WorkoutSession]
+    @Query(sort: \FoodLog.timestamp, order: .reverse) private var foodLogs: [FoodLog]
+    
+    // Quick Add Food states
+    @State private var showQuickAddMenu = false
+    @State private var showQuickScanSheet = false
+    @State private var showQuickAddSheet = false
+    @State private var selectedQuickMeal: MealCategory = .snack
+    @StateObject private var cameraPermission = CameraPermission()
+    @State private var showCameraDeniedAlert = false
+    @State private var showProfileEditor = false
+    @State private var showWeightEntrySheet = false
+    
+    // Card carousel
+    @State private var currentCardIndex = 0
+    
+    private let nutritionManager = NutritionManager.shared
+    private let today = Date()
+    
+    // Computed properties for today's data
+    private var todaysLogs: [FoodLog] {
+        foodLogs.filter { Calendar.current.isDateInToday($0.timestamp) }
+    }
+    
+    private var mealsLogged: Int {
+        Set(todaysLogs.map { $0.category }).count
+    }
+    
+    private var totalCalories: Int {
+        todaysLogs.reduce(0) { $0 + $1.calories }
+    }
+    
+    private var totalProtein: Double {
+        todaysLogs.reduce(0) { $0 + $1.protein }
+    }
+    
+    private var totalCarbs: Double {
+        todaysLogs.reduce(0) { $0 + $1.carbs }
+    }
+    
+    private var totalFats: Double {
+        todaysLogs.reduce(0) { $0 + $1.fats }
+    }
+    
+    private var calorieGoal: Int {
+        guard let profile = profile else { return 2000 }
+        return nutritionManager.calculateCaloricTarget(profile: profile)
+    }
+    
+    private var proteinGoal: Int { profile?.proteinGoal ?? 150 }
+    private var carbGoal: Int { 250 } // Default carb goal
+    private var fatGoal: Int { 67 }   // Default fat goal
+    
+    private var motivationalMessage: String {
+        if mealsLogged == 0 {
+            return "Let's get started!"
+        } else if mealsLogged >= 3 && totalProtein >= Double(proteinGoal) * 0.8 {
+            return "Crushing it!"
+        } else if mealsLogged >= 2 {
+            return "Keep it up!"
+        } else {
+            return "Good start!"
+        }
+    }
+    
+    private var progressDescription: String {
+        if mealsLogged == 0 {
+            return "Start logging your meals to track progress!"
+        }
+        return "You've logged \(mealsLogged) meal\(mealsLogged == 1 ? "" : "s") and \(Int(totalProtein))g of protein. See how to boost your progress!"
+    }
+    
+    var body: some View {
+        NavigationStack {
+            ZStack(alignment: .bottom) {
+                ScrollView {
+                    VStack(spacing: 16) {
+                        // Logging Progress Card
+                        loggingProgressCard
+                            .padding(.horizontal)
+                        
+                        // Macros Card with circular progress
+                        macrosCard
+                            .padding(.horizontal)
+                        
+                        // Page indicator dots
+                        HStack(spacing: 6) {
+                            ForEach(0..<4, id: \.self) { index in
+                                Circle()
+                                    .fill(index == currentCardIndex ? Color.blue : Color.gray.opacity(0.3))
+                                    .frame(width: 8, height: 8)
+                            }
+                        }
+                        .padding(.vertical, 8)
+                        
+                        // Steps and Exercise Cards
+                        HStack(spacing: 12) {
+                            stepsCard
+                            exerciseCard
+                        }
+                        .padding(.horizontal)
+                        
+                        // Weight Progress Card
+                        weightProgressCard
+                            .padding(.horizontal)
+                        
+                        // Bottom padding for FAB
+                        Spacer().frame(height: 100)
+                    }
+                    .padding(.top, 8)
+                }
+                .background(Color(.systemGroupedBackground))
+                
+                // Floating Add Button
+                floatingAddButton
+            }
+            .navigationTitle("Today")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Edit") {
+                        if profile != nil {
+                            showProfileEditor = true
+                        }
+                    }
+                    .disabled(profile == nil)
+                }
+            }
+            .alert("Camera permission needed", isPresented: $showCameraDeniedAlert) {
+                Button("OK", role: .cancel) {}
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+            } message: {
+                Text("Enable camera access in Settings to scan barcodes.")
+            }
+            .sheet(isPresented: $showQuickScanSheet) {
+                FoodScanSheet(selectedMealCategory: selectedQuickMeal) { }
+            }
+            .sheet(isPresented: $showQuickAddSheet) {
+                QuickAddFoodSheet(mealCategory: selectedQuickMeal, selectedDate: Calendar.current.startOfDay(for: today))
+            }
+            .sheet(isPresented: $showProfileEditor) {
+                if let profile {
+                    ProfileEditorSheet(profile: profile) {
+                        fetchUserProfile()
+                    }
+                }
+            }
         }
         .onAppear {
             fetchUserProfile()
         }
     }
+    
+    // MARK: - Logging Progress Card
+    
+    private var loggingProgressCard: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Spacer()
+                Button { } label: {
+                    Image(systemName: "plus")
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            VStack(spacing: 8) {
+                Text("Logging Progress")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                
+                Text(motivationalMessage)
+                    .font(.title2)
+                    .fontWeight(.bold)
+            }
+            
+            // Progress Arc
+            ZStack {
+                // Background arc
+                ProgressArc(progress: 1.0)
+                    .stroke(Color.gray.opacity(0.2), lineWidth: 8)
+                    .frame(height: 60)
+                
+                // Progress arc
+                ProgressArc(progress: min(Double(mealsLogged) / 4.0, 1.0))
+                    .stroke(
+                        LinearGradient(
+                            colors: [.gray, .blue],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                    )
+                    .frame(height: 60)
+            }
+            .padding(.horizontal, 40)
+            
+            // Description with link
+            HStack {
+                Text(progressDescriptionAttributed)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.leading)
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+    }
+    
+    private var progressDescriptionAttributed: AttributedString {
+        var result = AttributedString(progressDescription)
+        
+        // Highlight meals count
+        if let mealsRange = result.range(of: "\(mealsLogged) meal") {
+            result[mealsRange].foregroundColor = .blue
+        }
+        
+        // Highlight protein
+        if let proteinRange = result.range(of: "\(Int(totalProtein))g of protein") {
+            result[proteinRange].foregroundColor = .blue
+        }
+        
+        return result
+    }
+    
+    // MARK: - Macros Card
+    
+    private var macrosCard: some View {
+        Button {
+            selectedTab = 2 // Switch to Nutrition tab
+        } label: {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Text("Macros Today")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                HStack(spacing: 0) {
+                    macroRing(title: "Protein", current: Int(totalProtein), goal: proteinGoal, color: .orange)
+                    macroRing(title: "Carbs", current: Int(totalCarbs), goal: carbGoal, color: .blue)
+                    macroRing(title: "Fats", current: Int(totalFats), goal: fatGoal, color: .green)
+                }
+            }
+            .padding()
+            .background(Color(.systemBackground))
+            .cornerRadius(16)
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private func macroRing(title: String, current: Int, goal: Int, color: Color) -> some View {
+        let remaining = max(goal - current, 0)
+        let progress = goal > 0 ? min(Double(current) / Double(goal), 1.0) : 0
+        
+        return VStack(spacing: 8) {
+            Text(title)
+                .font(.caption)
+                .foregroundColor(color)
+            
+            ZStack {
+                // Background circle
+                Circle()
+                    .stroke(Color.gray.opacity(0.2), lineWidth: 8)
+                
+                // Progress circle
+                Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(color, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                
+                // Center text
+                VStack(spacing: 0) {
+                    Text("\(current)")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                    Text("/\(goal)g")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .frame(width: 80, height: 80)
+            
+            Text("\(remaining)g left")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+    
+    // MARK: - Steps Card
+    
+    private var stepsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Steps")
+                .font(.headline)
+            
+            HStack(spacing: 6) {
+                Image(systemName: "figure.walk")
+                    .foregroundColor(.red)
+                Text("6,000")
+                    .font(.title2)
+                    .fontWeight(.bold)
+            }
+            
+            Text("Goal: 15,000")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            // Progress bar
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(height: 6)
+                    
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.red)
+                        .frame(width: geometry.size.width * 0.4, height: 6)
+                }
+            }
+            .frame(height: 6)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+    }
+    
+    // MARK: - Exercise Card
+    
+    private var exerciseCard: some View {
+        let todaysWorkouts = workouts.filter { Calendar.current.isDateInToday($0.startTime) }
+        let totalMinutes = todaysWorkouts.reduce(0) { total, workout in
+            let duration = workout.endTime?.timeIntervalSince(workout.startTime) ?? 0
+            return total + Int(duration / 60)
+        }
+        let estimatedCalories = totalMinutes * 8  // Rough estimate
+        
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Exercise")
+                    .font(.headline)
+                Spacer()
+                Button {
+                    selectedTab = 1 // Switch to Lift tab
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                }
+            }
+            
+            HStack(spacing: 6) {
+                Image(systemName: "flame.fill")
+                    .foregroundColor(.orange)
+                Text("\(estimatedCalories) cal")
+                    .font(.title3)
+                    .fontWeight(.semibold)
+            }
+            
+            HStack(spacing: 6) {
+                Image(systemName: "clock.fill")
+                    .foregroundColor(.orange)
+                Text("\(totalMinutes / 60):\(String(format: "%02d", totalMinutes % 60)) hr")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+    }
+    
+    // MARK: - Weight Progress Card
+    
+    private var weightProgressCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Weight Progress")
+                    .font(.headline)
+                Spacer()
+                Button {
+                    showWeightEntrySheet = true
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundColor(.blue)
+                }
+            }
+            
+            if weightLogs.count >= 2 {
+                Chart {
+                    ForEach(weightLogs.prefix(7).reversed(), id: \.date) { log in
+                        LineMark(
+                            x: .value("Date", log.date),
+                            y: .value("Weight", log.weight)
+                        )
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .blue],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .symbol(.circle)
+                        
+                        PointMark(
+                            x: .value("Date", log.date),
+                            y: .value("Weight", log.weight)
+                        )
+                        .foregroundStyle(.purple)
+                    }
+                }
+                .chartXAxis(.hidden)
+                .chartYAxis {
+                    AxisMarks(position: .leading)
+                }
+                .frame(height: 120)
+            } else {
+                VStack(spacing: 8) {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(.title)
+                        .foregroundColor(.gray.opacity(0.5))
+                    Text("Log at least 2 weigh-ins to see your trend")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 100)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+    }
+    
+    // MARK: - Floating Add Button
+    
+    private var floatingAddButton: some View {
+        VStack {
+            Spacer()
+            HStack {
+                Spacer()
+                Button {
+                    showQuickAddSheet = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.title2.bold())
+                        .foregroundColor(.white)
+                        .frame(width: 56, height: 56)
+                        .background(
+                            Circle()
+                                .fill(Color.blue)
+                                .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
+                        )
+                }
+                .padding(.trailing, 20)
+            }
+            .padding(.bottom, 20)
+        }
+        .sheet(isPresented: $showWeightEntrySheet) {
+            WeightEntrySheet()
+        }
+    }
+    
+    // MARK: - Helpers
     
     private func fetchUserProfile() {
         do {
@@ -2192,6 +3211,317 @@ struct DashboardView: View {
     }
 }
 
+// MARK: - Profile Editor Sheet
+
+struct ProfileEditorSheet: View {
+    @Bindable var profile: UserProfile
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    
+    let onSave: () -> Void
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    HStack {
+                        Text("Current Weight")
+                        Spacer()
+                        TextField("kg", value: $profile.currentWeight, format: .number)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                        Text("kg")
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    HStack {
+                        Text("Height")
+                        Spacer()
+                        TextField("cm", value: $profile.heightCm, format: .number)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                        Text("cm")
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    HStack {
+                        Text("Age")
+                        Spacer()
+                        TextField("years", value: $profile.age, format: .number)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                        Text("years")
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Picker("Gender", selection: $profile.gender) {
+                        Text("Male").tag(Gender.male)
+                        Text("Female").tag(Gender.female)
+                    }
+                } header: {
+                    Text("Body Metrics")
+                }
+
+                Section {
+                    Picker("Activity", selection: $profile.activityLevel) {
+                        ForEach(ActivityLevel.allCases, id: \.self) { level in
+                            Text(level.description).tag(level)
+                        }
+                    }
+                    .pickerStyle(.navigationLink)
+                } header: {
+                    Text("Activity Level")
+                }
+
+                Section {
+                    HStack {
+                        Text("Daily Calories")
+                        Spacer()
+                        TextField("kcal", value: $profile.caloricGoal, format: .number)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                        Text("kcal")
+                            .foregroundColor(.secondary)
+                    }
+
+                    HStack {
+                        Text("Weight Change Rate")
+                        Spacer()
+                        TextField("kg/week", value: $profile.goalRatePerWeekKg, format: .number.precision(.fractionLength(1)))
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                        Text("kg/wk")
+                            .foregroundColor(.secondary)
+                    }
+                } header: {
+                    Text("Goals")
+                }
+
+                Section {
+                    HStack {
+                        Text("Protein")
+                        Spacer()
+                        TextField("g", value: $profile.proteinGoal, format: .number)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                        Text("g")
+                            .foregroundColor(.secondary)
+                    }
+
+                    HStack {
+                        Text("Carbs")
+                        Spacer()
+                        TextField("g", value: $profile.carbsGoal, format: .number)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                        Text("g")
+                            .foregroundColor(.secondary)
+                    }
+
+                    HStack {
+                        Text("Fats")
+                        Spacer()
+                        TextField("g", value: $profile.fatsGoal, format: .number)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                        Text("g")
+                            .foregroundColor(.secondary)
+                    }
+
+                    HStack {
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 4) {
+                            let totalCals = (profile.proteinGoal * 4) + (profile.carbsGoal * 4) + (profile.fatsGoal * 9)
+                            Text("Total from macros: \(totalCals) kcal")
+                                .font(.caption)
+                                .foregroundColor(abs(totalCals - profile.caloricGoal) <= 50 ? .green : .orange)
+                            if abs(totalCals - profile.caloricGoal) > 50 {
+                                Text("⚠️ Doesn't match calorie goal")
+                                    .font(.caption2)
+                                    .foregroundColor(.orange)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Macro Goals (per day)")
+                }
+
+                Section {
+                    VStack(spacing: 16) {
+                        HStack {
+                            Text("Breakfast")
+                                .frame(width: 100, alignment: .leading)
+                            Slider(value: Binding(
+                                get: { Double(profile.breakfastPercentage) },
+                                set: { profile.breakfastPercentage = Int($0) }
+                            ), in: 0...100, step: 5)
+                            Text("\(profile.breakfastPercentage)%")
+                                .frame(width: 50, alignment: .trailing)
+                                .foregroundColor(.secondary)
+                        }
+
+                        HStack {
+                            Text("Lunch")
+                                .frame(width: 100, alignment: .leading)
+                            Slider(value: Binding(
+                                get: { Double(profile.lunchPercentage) },
+                                set: { profile.lunchPercentage = Int($0) }
+                            ), in: 0...100, step: 5)
+                            Text("\(profile.lunchPercentage)%")
+                                .frame(width: 50, alignment: .trailing)
+                                .foregroundColor(.secondary)
+                        }
+
+                        HStack {
+                            Text("Dinner")
+                                .frame(width: 100, alignment: .leading)
+                            Slider(value: Binding(
+                                get: { Double(profile.dinnerPercentage) },
+                                set: { profile.dinnerPercentage = Int($0) }
+                            ), in: 0...100, step: 5)
+                            Text("\(profile.dinnerPercentage)%")
+                                .frame(width: 50, alignment: .trailing)
+                                .foregroundColor(.secondary)
+                        }
+
+                        HStack {
+                            Text("Snacks")
+                                .frame(width: 100, alignment: .leading)
+                            Slider(value: Binding(
+                                get: { Double(profile.snackPercentage) },
+                                set: { profile.snackPercentage = Int($0) }
+                            ), in: 0...100, step: 5)
+                            Text("\(profile.snackPercentage)%")
+                                .frame(width: 50, alignment: .trailing)
+                                .foregroundColor(.secondary)
+                        }
+
+                        let totalPercentage = profile.breakfastPercentage + profile.lunchPercentage + profile.dinnerPercentage + profile.snackPercentage
+                        HStack {
+                            Spacer()
+                            Text("Total: \(totalPercentage)%")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(totalPercentage == 100 ? .green : .red)
+                            if totalPercentage != 100 {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.red)
+                                    .font(.caption)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 8)
+                } header: {
+                    Text("Meal Distribution")
+                } footer: {
+                    Text("Distribute your daily calories across meals. Total should equal 100%.")
+                }
+                
+                Section {
+                    Button {
+                        // Calculate recommended calories based on profile
+                        let calculatedGoal = NutritionManager.shared.calculateCaloricTarget(profile: profile)
+                        profile.caloricGoal = calculatedGoal
+                    } label: {
+                        HStack {
+                            Image(systemName: "wand.and.stars")
+                            Text("Auto-Calculate Calorie Goal")
+                        }
+                    }
+
+                    Button {
+                        // Auto-calculate macros based on common ratios
+                        // Protein: 2g per kg of body weight
+                        profile.proteinGoal = Int(profile.currentWeight * 2.0)
+
+                        // Calculate remaining calories after protein
+                        let proteinCals = profile.proteinGoal * 4
+                        let remainingCals = profile.caloricGoal - proteinCals
+
+                        // Split remaining 40% carbs, 60% fats of remaining calories
+                        let carbsCals = Int(Double(remainingCals) * 0.40)
+                        let fatsCals = Int(Double(remainingCals) * 0.60)
+
+                        profile.carbsGoal = carbsCals / 4
+                        profile.fatsGoal = fatsCals / 9
+                    } label: {
+                        HStack {
+                            Image(systemName: "wand.and.stars")
+                            Text("Auto-Calculate Macros")
+                        }
+                    }
+
+                    Button {
+                        // Reset meal percentages to balanced distribution
+                        profile.breakfastPercentage = 25
+                        profile.lunchPercentage = 35
+                        profile.dinnerPercentage = 30
+                        profile.snackPercentage = 10
+                    } label: {
+                        HStack {
+                            Image(systemName: "arrow.counterclockwise")
+                            Text("Reset Meal Distribution")
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Edit Profile")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        try? modelContext.save()
+                        onSave()
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Progress Arc Shape
+
+struct ProgressArc: Shape {
+    var progress: Double
+    
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+    
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let center = CGPoint(x: rect.midX, y: rect.maxY)
+        let radius = min(rect.width / 2, rect.height)
+        
+        path.addArc(
+            center: center,
+            radius: radius,
+            startAngle: .degrees(180),
+            endAngle: .degrees(180 + (180 * progress)),
+            clockwise: false
+        )
+        
+        return path
+    }
+}
+
 // MARK: - 8) Food Scan Sheet (module wired into app)
 
 struct FoodScanSheet: View {
@@ -2203,10 +3533,8 @@ struct FoodScanSheet: View {
     
     @StateObject private var vm: FoodScanViewModel
     
-    // Backend API URL
-    // Development: Use localhost (requires backend running on same machine or network)
-    // Production: Replace with your deployed server URL (e.g., "https://api.ironfuel.com")
-    private let backendBaseURL = URL(string: "http://localhost:8000")!
+    // Set your backend base URL here
+    private let backendBaseURL = URL(string: "https://api.yourapp.com")!
     
     init(selectedMealCategory: MealCategory, onLogged: @escaping () -> Void) {
         self.selectedMealCategory = selectedMealCategory
@@ -2291,10 +3619,8 @@ struct FoodScanSheet: View {
                 }
             }
             .onAppear {
-                let cache = SwiftDataFoodCache(context: modelContext)
-                let backend = HTTPFoodBackendClient(baseURL: backendBaseURL)
-                let service = FoodLookupService(cache: cache, backend: backend)
-                _vm.wrappedValue = FoodScanViewModel(lookupService: service)
+                // Note: Cannot reassign @StateObject after init
+                // The FoodScanSheet is designed to initialize vm properly in init
             }
         }
     }
@@ -2309,7 +3635,7 @@ struct FoodScanSheet: View {
         }
     }
     
-    private func log(product: FoodProduct) {
+    private func log(product: FoodProductDTO) {
         let servingG = product.servingSizeG ?? 100
         let n = product.nutrients ?? FoodNutrients()
         
@@ -2333,7 +3659,6 @@ struct FoodScanSheet: View {
         
         modelContext.insert(entry)
         try? modelContext.save()
-        AchievementManager.shared.evaluateAfterPersistingLog(entry, context: modelContext)
         
         onLogged()
         dismiss()
@@ -2345,8 +3670,8 @@ private struct DummyBackend: FoodBackendClient {
     func fetchByGTIN14(_ gtin14: String) async throws -> FoodProductDTO? { nil }
 }
 @MainActor private final class DummyCache: FoodCache {
-    func getProduct(gtin14: String) async throws -> FoodProduct? { nil }
-    func upsertProduct(_ product: FoodProduct) async throws {}
+    func getProduct(gtin14: String) async throws -> FoodProductDTO? { nil }
+    func upsertProduct(_ product: FoodProductDTO) async throws {}
 }
 
 // MARK: - 9) Food Diary UI (FoodLogView) – now uses FoodScanSheet
@@ -2354,529 +3679,719 @@ private struct DummyBackend: FoodBackendClient {
 struct FoodLogView: View {
     @Environment(\.modelContext) private var modelContext
     
-    // Phase 4: multi-day diary
-    @State private var selectedDate: Date = Date()
+    // Date selection
+    @State private var selectedDate: Date = Calendar.current.startOfDay(for: Date())
+    @State private var weekDates: [Date] = []
     
     // Scan UX
     @StateObject private var cameraPermission = CameraPermission()
     @State private var showingScanSheet = false
     @State private var showCameraDeniedAlert = false
-    @State private var showGenericFoodsSheet = false
-    @State private var showVoiceInputSheet = false
     
-    @State private var selectedMealCategory: MealCategory = .breakfast
-    @State private var searchFoodText: String = ""
+    // Quick add popup
+    @State private var showQuickAddMenu = false
+    @State private var selectedMealForAdd: MealCategory = .breakfast
+    
+    // Sheets
     @State private var showLogFoodSheet: Bool = false
-    @State private var selectedFoodForLogging: FoodItem?
-    @State private var profile: UserProfile?
-    @State private var showBudgetEditor = false
-    @State private var showTemplateBuilder = false
-    @State private var showRecipeBuilder = false
-    @State private var showBadges = false
+    @State private var showCheatMeals: Bool = false
+    @State private var showQuickAddSheet: Bool = false
+    @State private var showVoiceLogging: Bool = false
+    @State private var showMealScan: Bool = false
+    
+    // Collapsed sections
+    @State private var collapsedSections: Set<MealCategory> = []
     
     @Query(sort: \FoodLog.timestamp, order: .reverse) private var foodLogs: [FoodLog]
-    @Query(sort: \MealTemplate.createdAt, order: .reverse) private var mealTemplates: [MealTemplate]
-    @Query(sort: \Recipe.createdAt, order: .reverse) private var recipes: [Recipe]
-    @Query(sort: \AchievementBadge.unlockedAt, order: .reverse) private var badges: [AchievementBadge]
+    @Query private var profiles: [UserProfile]
     
-    private let nutritionManager = NutritionManager.shared
+    private var profile: UserProfile? { profiles.first }
     
-    var filteredFoodLogs: [FoodLog] {
-        foodLogs.filter { log in
-            Calendar.current.isDate(log.timestamp, inSameDayAs: selectedDate) &&
-            (searchFoodText.isEmpty || log.foodName.localizedCaseInsensitiveContains(searchFoodText)) &&
-            (log.category == selectedMealCategory)
-        }
+    private var calorieGoal: Int {
+        guard let profile = profile else { return 2060 }
+        return NutritionManager.shared.calculateCaloricTarget(profile: profile)
     }
     
-    // Computed remaining macros for the day
-    private var remainingMacros: (kcal: Int, protein: Double, carbs: Double) {
-        guard let profile = profile else { return (0, 0, 0) }
-        return nutritionManager.getRemainingMacros(for: selectedDate, profile: profile, context: modelContext)
+    private var proteinGoal: Int { profile?.proteinGoal ?? 150 }
+    
+    private var dailyLogs: [FoodLog] {
+        foodLogs.filter { Calendar.current.isDate($0.timestamp, inSameDayAs: selectedDate) }
     }
     
-    // Computed target/consumed for selected meal
-    private var mealTarget: (kcal: Int, protein: Double, carbs: Double) {
-        guard let profile = profile else { return (0, 0, 0) }
-        return nutritionManager.getMealTarget(meal: selectedMealCategory, profile: profile)
+    private var totalCalories: Int {
+        dailyLogs.reduce(0) { $0 + $1.calories }
     }
     
-    private var mealConsumed: (kcal: Int, protein: Double, carbs: Double, fats: Double) {
-        nutritionManager.getMealSummary(for: selectedDate, meal: selectedMealCategory, context: modelContext)
+    private var totalProtein: Double {
+        dailyLogs.reduce(0) { $0 + $1.protein }
     }
     
-    // Favorite foods for quick re-logging
-    private var favoriteFoods: [FoodLog] {
-        foodLogs.filter { $0.isFavorite }
-            .reduce(into: [String: FoodLog]()) { dict, log in
-                if dict[log.foodName] == nil { dict[log.foodName] = log }
-            }
-            .values.sorted { $0.foodName < $1.foodName }
+    private var totalCarbs: Double {
+        dailyLogs.reduce(0) { $0 + $1.carbs }
     }
     
-    private var recentFoods: [FoodLog] {
-        var seen: Set<String> = []
-        var results: [FoodLog] = []
-        
-        for log in foodLogs where log.category == selectedMealCategory {
-            if !seen.contains(log.foodName) {
-                seen.insert(log.foodName)
-                results.append(log)
-            }
-            if results.count >= 6 { break }
-        }
-        return results
+    private var totalFats: Double {
+        dailyLogs.reduce(0) { $0 + $1.fats }
     }
     
-    private var templatesForMeal: [MealTemplate] {
-        mealTemplates.filter { $0.meal == selectedMealCategory }
+    private func logsFor(meal: MealCategory) -> [FoodLog] {
+        dailyLogs.filter { $0.category == meal }
+    }
+    
+    private func caloriesFor(meal: MealCategory) -> Int {
+        logsFor(meal: meal).reduce(0) { $0 + $1.calories }
     }
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 10) {
-                // Remaining macros floating bar
-                if profile != nil {
-                    RemainingMacrosBar(
-                        remainingKcal: remainingMacros.kcal,
-                        remainingProtein: remainingMacros.protein,
-                        remainingCarbs: remainingMacros.carbs,
-                        targetKcal: nutritionManager.calculateCaloricTarget(profile: profile!)
-                    )
-                    .padding(.horizontal)
-                }
-                
-                DatePicker("Date", selection: $selectedDate, displayedComponents: [.date])
-                    .datePickerStyle(.compact)
-                    .padding(.horizontal)
-                
-                // Meal budget card for selected meal
-                if profile != nil {
-                    MealBudgetCard(
-                        meal: selectedMealCategory,
-                        consumed: mealConsumed,
-                        target: mealTarget
-                    )
-                        .padding(.horizontal)
-                    
-                    Button {
-                        showBudgetEditor = true
-                    } label: {
-                        Label("Adjust meal budgets", systemImage: "slider.horizontal.3")
-                            .font(.caption)
-                    }
-                    .padding(.horizontal)
-                }
-                
-                if !badges.isEmpty {
-                    BadgeRibbon(badges: Array(badges.prefix(5)))
-                        .padding(.horizontal)
-                        .onTapGesture { showBadges = true }
-                }
-                
-                Button(action: {
-                    Task {
-                        cameraPermission.refresh()
-                        if !cameraPermission.authorised {
-                            await cameraPermission.request()
+            ZStack(alignment: .bottom) {
+                ScrollView {
+                    VStack(spacing: 0) {
+                        // Week Day Selector
+                        weekDaySelector
+                            .padding(.horizontal)
+                            .padding(.top, 8)
+                        
+                        // Calorie & Macro Summary Card
+                        calorieSummaryCard
+                            .padding(.horizontal)
+                            .padding(.top, 16)
+                        
+                        // Meal Sections
+                        VStack(spacing: 0) {
+                            ForEach(MealCategory.allCases, id: \.self) { meal in
+                                mealSection(for: meal)
+                            }
                         }
-                        if cameraPermission.authorised {
-                            showingScanSheet = true
-                        } else {
-                            showCameraDeniedAlert = true
+                        .padding(.top, 16)
+                        
+                        // View All Button
+                        NavigationLink(destination: FoodHistoryView()) {
+                            Text("View all")
+                                .font(.subheadline)
+                                .foregroundColor(.blue)
                         }
+                        .padding(.vertical, 16)
+                        
+                        // Bottom padding for floating button
+                        Spacer().frame(height: 100)
                     }
-                }) {
-                    Label("Barcode Scan", systemImage: "barcode.viewfinder")
+                }
+                .background(Color(.systemGroupedBackground))
+                
+                // Floating Add Button
+                floatingAddButton
+            }
+            .navigationTitle("Today")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Text("\(calorieGoal - totalCalories > 0 ? calorieGoal - totalCalories : 0)")
                         .font(.headline)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.accentColor)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
+                        .foregroundColor(.primary)
                 }
-                .padding(.horizontal)
-                .alert("Camera permission needed", isPresented: $showCameraDeniedAlert) {
-                    Button("OK", role: .cancel) {}
-                    Button("Open Settings") {
-                        if let url = URL(string: UIApplication.openSettingsURLString) {
-                            UIApplication.shared.open(url)
-                        }
-                    }
-                } message: {
-                    Text("Enable camera access in Settings to scan barcodes.")
-                }
-
-                Button(action: {
-                    showVoiceInputSheet = true
-                }) {
-                    Label("Voice Input", systemImage: "mic.fill")
-                        .font(.headline)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.green)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                }
-                .padding(.horizontal)
-
-                TextField("Search foods…", text: $searchFoodText)
-                    .padding(8)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(8)
-                    .padding(.horizontal)
-                
-                Picker("Meal", selection: $selectedMealCategory) {
-                    ForEach(MealCategory.allCases, id: \.self) { category in
-                        Text(category.rawValue.capitalized).tag(category)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal)
-                
-                List {
-                    // Quick access section
-                    Section("Quick Add") {
-                        Button {
-                            showGenericFoodsSheet = true
-                        } label: {
-                            Label("Generic Ingredients", systemImage: "leaf.fill")
-                        }
-                        
-                        Button("Add Food Manually") {
-                            selectedFoodForLogging = FoodItem(name: "Custom Food", calories: 0, protein: 0, carbs: 0, fats: 0)
-                            showLogFoodSheet = true
-                        }
-                        
-                        Button {
-                            showRecipeBuilder = true
-                        } label: {
-                            Label("Recipe Builder", systemImage: "wand.and.stars")
-                        }
-                    }
-                    
-                    // Favorites section
-                    if !favoriteFoods.isEmpty {
-                        Section("⭐ Favorites") {
-                            ForEach(favoriteFoods.prefix(5)) { log in
-                                Button {
-                                    logAgain(from: log)
-                                } label: {
-                                    HStack {
-                                        VStack(alignment: .leading) {
-                                            Text(log.foodName).font(.subheadline)
-                                            Text("\(Int(log.servingSize))g • \(log.calories) kcal")
-                                                .font(.caption).foregroundColor(.secondary)
-                                        }
-                                        Spacer()
-                                        Image(systemName: "plus.circle.fill")
-                                            .foregroundColor(.accentColor)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    if !recentFoods.isEmpty {
-                        Section("🕑 Recent") {
-                            ForEach(recentFoods) { log in
-                                Button {
-                                    logAgain(from: log, markFavorite: false)
-                                } label: {
-                                    HStack {
-                                        VStack(alignment: .leading) {
-                                            Text(log.foodName).font(.subheadline)
-                                            Text("\(Int(log.servingSize))g • \(log.calories) kcal")
-                                                .font(.caption).foregroundColor(.secondary)
-                                        }
-                                        Spacer()
-                                        Image(systemName: "clock.arrow.circlepath")
-                                            .foregroundColor(.blue)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    Section("🍱 Meal Templates") {
-                        Button {
-                            showTemplateBuilder = true
-                        } label: {
-                            Label("Save current meal as template", systemImage: "tray.and.arrow.down")
-                        }
-                        .disabled(filteredFoodLogs.isEmpty)
-                        
-                        if templatesForMeal.isEmpty {
-                            Text("No templates yet for \(selectedMealCategory.rawValue).")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        } else {
-                            ForEach(templatesForMeal) { template in
-                                Button {
-                                    logTemplate(template)
-                                } label: {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text(template.name).font(.subheadline)
-                                            Text("\(template.items.count) items • \(template.totalCalories) kcal")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                        Spacer()
-                                        Image(systemName: "plus.app.fill")
-                                            .foregroundColor(.accentColor)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    Section("🍳 Recipes") {
-                        ForEach(recipes) { recipe in
-                            Button {
-                                logRecipe(recipe)
-                            } label: {
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(recipe.name).font(.subheadline)
-                                        Text("\(recipe.servings) servings • \(recipe.caloriesPerServing) kcal/serving")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    Spacer()
-                                    Image(systemName: "plus.circle.fill")
-                                        .foregroundColor(.orange)
-                                }
-                            }
-                        }
-                        
-                        Button {
-                            showRecipeBuilder = true
-                        } label: {
-                            Label(recipes.isEmpty ? "Build your first recipe" : "New recipe", systemImage: "plus.square.on.square")
-                        }
-                    }
-                    
-                    if !badges.isEmpty {
-                        Section("🎖️ Badges") {
-                            BadgeRibbon(badges: Array(badges.prefix(5)))
-                                .onTapGesture { showBadges = true }
-                        }
-                    }
-                    
-                    Section("\(selectedMealCategory.rawValue.capitalized) on \(selectedDate.formatted(date: .abbreviated, time: .omitted))") {
-                        if filteredFoodLogs.isEmpty {
-                            Text("No entries yet.")
-                                .foregroundColor(.secondary)
-                        } else {
-                            ForEach(filteredFoodLogs) { log in
-                                FoodLogRow(log: log)
-                            }
-                            .onDelete(perform: deleteFoodLog)
-                        }
-                    }
-                }
-                .navigationTitle("Nutrition Log")
-            }
-            .sheet(isPresented: $showingScanSheet) {
-                FoodScanSheet(selectedMealCategory: selectedMealCategory) {
-                    // achievements handled inside scan sheet
-                }
-            }
-            .sheet(isPresented: $showLogFoodSheet) {
-                if let food = selectedFoodForLogging {
-                    LogFoodEntryView(foodItem: food, category: selectedMealCategory) { newFoodLog in
-                        persistLog(newFoodLog)
-                    }
-                }
-            }
-            .sheet(isPresented: $showGenericFoodsSheet) {
-                GenericFoodsSheet(selectedMealCategory: selectedMealCategory) {
-                    // Refresh after logging
-                }
-            }
-            .sheet(isPresented: $showVoiceInputSheet) {
-                VoiceInputSheet(selectedMealCategory: selectedMealCategory) {
-                    // Refresh after logging
-                }
-            }
-            .sheet(isPresented: $showBudgetEditor) {
-                if let profile = profile {
-                    BudgetEditorSheet(profile: profile) {
-                        try? modelContext.save()
-                    }
-                }
-            }
-            .sheet(isPresented: $showTemplateBuilder) {
-                MealTemplateBuilderSheet(meal: selectedMealCategory, logs: filteredFoodLogs) { name in
-                    saveTemplate(named: name)
-                }
-            }
-            .sheet(isPresented: $showRecipeBuilder) {
-                RecipeBuilderSheet { recipe in
-                    modelContext.insert(recipe)
-                    try? modelContext.save()
-                    AchievementManager.shared.evaluateAfterRecipeCreated(context: modelContext)
-                }
-            }
-            .sheet(isPresented: $showBadges) {
-                BadgeShelfView(badges: badges)
             }
             .onAppear {
-                fetchProfile()
+                setupWeekDates()
+            }
+            .sheet(isPresented: $showingScanSheet) {
+                FoodScanSheet(selectedMealCategory: selectedMealForAdd) { }
+            }
+            .sheet(isPresented: $showQuickAddSheet) {
+                QuickAddFoodSheet(mealCategory: selectedMealForAdd, selectedDate: selectedDate)
+            }
+            .sheet(isPresented: $showCheatMeals) {
+                CheatMealsView(mealCategory: selectedMealForAdd) { _ in }
+            }
+            .sheet(isPresented: $showVoiceLogging) {
+                VoiceDictationSheet { parsedResult in
+                    handleVoiceResult(parsedResult)
+                }
+            }
+            .sheet(isPresented: $showMealScan) {
+                FoodScanSheet(selectedMealCategory: selectedMealForAdd) { }
+            }
+            .alert("Camera permission needed", isPresented: $showCameraDeniedAlert) {
+                Button("OK", role: .cancel) {}
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+            } message: {
+                Text("Enable camera access in Settings to scan barcodes.")
             }
         }
     }
     
-    private func fetchProfile() {
-        do {
-            let descriptor = FetchDescriptor<UserProfile>()
-            if let existing = try modelContext.fetch(descriptor).first {
-                self.profile = existing
-            } else {
-                let newProfile = UserProfile()
-                modelContext.insert(newProfile)
-                self.profile = newProfile
+    // MARK: - Week Day Selector
+    
+    private var weekDaySelector: some View {
+        HStack(spacing: 0) {
+            ForEach(weekDates, id: \.self) { date in
+                let isSelected = Calendar.current.isDate(date, inSameDayAs: selectedDate)
+                let hasLogs = foodLogs.contains { Calendar.current.isDate($0.timestamp, inSameDayAs: date) }
+                let isToday = Calendar.current.isDateInToday(date)
+                
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedDate = date
+                    }
+                } label: {
+                    VStack(spacing: 6) {
+                        Text(date.formatted(.dateTime.weekday(.narrow)))
+                            .font(.caption2)
+                            .foregroundColor(isSelected ? .primary : .secondary)
+                        
+                        ZStack {
+                            if hasLogs {
+                                Circle()
+                                    .fill(Color.blue)
+                                    .frame(width: 28, height: 28)
+                                Image(systemName: "checkmark")
+                                    .font(.caption2.bold())
+                                    .foregroundColor(.white)
+                            } else if isToday {
+                                Circle()
+                                    .strokeBorder(Color.primary.opacity(0.3), lineWidth: 1)
+                                    .frame(width: 28, height: 28)
+                                Circle()
+                                    .fill(Color.primary.opacity(0.1))
+                                    .frame(width: 6, height: 6)
+                            } else {
+                                Circle()
+                                    .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1)
+                                    .frame(width: 28, height: 28)
+                            }
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity)
             }
-        } catch {
-            print("Error fetching profile in FoodLogView: \(error)")
+        }
+        .padding(.vertical, 12)
+    }
+    
+    // MARK: - Calorie Summary Card
+    
+    private var calorieSummaryCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Calories Row
+            HStack(alignment: .firstTextBaseline) {
+                Text("Calories")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text("\(totalCalories) cal")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                Text("/ \(calorieGoal)")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            
+            // Macros Row
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Macros")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                
+                HStack(spacing: 24) {
+                    macroItem(value: Int(totalCarbs), label: "Carbs", color: .blue)
+                    macroItem(value: Int(totalFats), label: "Fat", color: .pink)
+                    macroItem(value: Int(totalProtein), label: "Protein", color: .orange)
+                }
+            }
+        }
+        .padding(16)
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+    }
+    
+    private func macroItem(value: Int, label: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                Text("\(value)g")
+                    .font(.headline)
+                Circle()
+                    .fill(color)
+                    .frame(width: 8, height: 8)
+            }
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
     }
     
-    private func persistLog(_ log: FoodLog) {
-        modelContext.insert(log)
-        try? modelContext.save()
-        AchievementManager.shared.evaluateAfterPersistingLog(log, context: modelContext)
-    }
+    // MARK: - Meal Section
     
-    private func logAgain(from original: FoodLog, markFavorite: Bool = true) {
-        let newLog = FoodLog(
-            foodName: original.foodName,
-            servingSize: original.servingSize,
-            calories: original.calories,
-            protein: original.protein,
-            carbs: original.carbs,
-            fats: original.fats,
-            category: selectedMealCategory,
-            isFavorite: markFavorite || original.isFavorite,
-            sourceType: original.sourceType,
-            sourceId: original.sourceId
-        )
-        persistLog(newLog)
-    }
-    
-    private func saveTemplate(named name: String) {
-        guard !filteredFoodLogs.isEmpty else { return }
-        let template = MealTemplate(name: name, meal: selectedMealCategory)
-        filteredFoodLogs.forEach { log in
-            let item = MealTemplateItem(
-                foodName: log.foodName,
-                servingSize: log.servingSize,
-                calories: log.calories,
-                protein: log.protein,
-                carbs: log.carbs,
-                fats: log.fats,
-                template: template
-            )
-            template.items.append(item)
-        }
-        modelContext.insert(template)
-        try? modelContext.save()
-    }
-    
-    private func logTemplate(_ template: MealTemplate) {
-        for item in template.items {
-            let entry = FoodLog(
-                timestamp: Date(),
-                foodName: item.foodName,
-                servingSize: item.servingSize,
-                calories: item.calories,
-                protein: item.protein,
-                carbs: item.carbs,
-                fats: item.fats,
-                category: template.meal,
-                isFavorite: false,
-                sourceType: "template",
-                sourceId: template.id.uuidString
-            )
-            persistLog(entry)
-        }
-    }
-    
-    private func logRecipe(_ recipe: Recipe) {
-        let entry = FoodLog(
-            timestamp: Date(),
-            foodName: recipe.name,
-            servingSize: 1,
-            calories: recipe.caloriesPerServing,
-            protein: recipe.proteinPerServing,
-            carbs: recipe.carbsPerServing,
-            fats: recipe.fatsPerServing,
-            category: selectedMealCategory,
-            isFavorite: false,
-            sourceType: "recipe",
-            sourceId: recipe.id.uuidString
-        )
-        persistLog(entry)
-    }
-    
-    private func deleteFoodLog(at offsets: IndexSet) {
-        for index in offsets {
-            let logToDelete = filteredFoodLogs[index]
-            modelContext.delete(logToDelete)
-        }
-        try? modelContext.save()
-    }
-}
-
-struct FoodLogRow: View {
-    @Bindable var log: FoodLog
-    
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text(log.foodName).font(.headline)
-                HStack {
-                    Text("\(Int(log.servingSize))g")
+    private func mealSection(for meal: MealCategory) -> some View {
+        let isCollapsed = collapsedSections.contains(meal)
+        let logs = logsFor(meal: meal)
+        let calories = caloriesFor(meal: meal)
+        
+        return VStack(spacing: 0) {
+            // Header
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    if isCollapsed {
+                        collapsedSections.remove(meal)
+                    } else {
+                        collapsedSections.insert(meal)
+                    }
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    mealIcon(for: meal)
+                        .font(.title3)
+                    
+                    Text(meal.rawValue.capitalized)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    if calories > 0 {
+                        Text("\(calories) cal")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    
                     Spacer()
-                    Text("\(log.calories) kcal")
-                    Text("P:\(Int(log.protein)) C:\(Int(log.carbs)) F:\(Int(log.fats))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    
+                    Button {
+                        selectedMealForAdd = meal
+                        showQuickAddSheet = true
+                    } label: {
+                        Text("Add")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.blue)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 14)
+                .background(Color(.systemBackground))
+            }
+            
+            // Food entries (if not collapsed)
+            if !isCollapsed && !logs.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(logs) { log in
+                        NavigationLink(destination: EditFoodLogSheet(foodLog: log)) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(log.foodName)
+                                        .font(.subheadline)
+                                        .foregroundColor(.primary)
+                                    Text("\(Int(log.servingSize))g")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+
+                                Spacer()
+
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text("\(log.calories) kcal")
+                                        .font(.subheadline)
+                                        .foregroundColor(.primary)
+                                    Text("P:\(Int(log.protein)) C:\(Int(log.carbs)) F:\(Int(log.fats))")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            .padding(.horizontal)
+                            .padding(.vertical, 10)
+                            .background(Color(.systemBackground))
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                deleteFoodLog(log)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+
+                        Divider()
+                            .padding(.leading)
+                    }
                 }
             }
             
-            Button {
-                log.isFavorite.toggle()
-            } label: {
-                Image(systemName: log.isFavorite ? "star.fill" : "star")
-                    .foregroundColor(log.isFavorite ? .yellow : .gray)
+            Divider()
+        }
+    }
+    
+    private func mealIcon(for meal: MealCategory) -> some View {
+        let icon: String
+        switch meal {
+        case .breakfast: icon = "🍳"
+        case .lunch: icon = "🥗"
+        case .dinner: icon = "🍽️"
+        case .snack: icon = "🍪"
+        }
+        return Text(icon)
+    }
+    
+    // MARK: - Floating Add Button
+    
+    private var floatingAddButton: some View {
+        ZStack {
+            if showQuickAddMenu {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.3)) {
+                            showQuickAddMenu = false
+                        }
+                    }
+                
+                VStack(spacing: 0) {
+                    Spacer()
+                    
+                    // Quick Actions Menu
+                    VStack(spacing: 0) {
+                        HStack(spacing: 24) {
+                            quickActionButton(icon: "magnifyingglass", title: "Log Food", color: .blue) {
+                                showQuickAddMenu = false
+                                showQuickAddSheet = true
+                            }
+                            
+                            quickActionButton(icon: "barcode", title: "Barcode Scan", color: .orange) {
+                                showQuickAddMenu = false
+                                requestCameraAndScan()
+                            }
+                        }
+                        .padding(.vertical, 20)
+                        
+                        HStack(spacing: 24) {
+                            quickActionButton(icon: "mic.fill", title: "Voice Log", color: .pink) {
+                                showQuickAddMenu = false
+                                showVoiceLogging = true
+                            }
+
+                            quickActionButton(icon: "camera.fill", title: "Meal Scan", color: .green) {
+                                showQuickAddMenu = false
+                                showMealScan = true
+                            }
+                        }
+                        .padding(.bottom, 20)
+                        
+                        Divider()
+                        
+                        // Additional options
+                        VStack(spacing: 0) {
+                            quickOptionRow(icon: "drop.fill", title: "Water", color: .cyan)
+                            Divider().padding(.leading, 44)
+                            quickOptionRow(icon: "scalemass.fill", title: "Weight", color: .green)
+                            Divider().padding(.leading, 44)
+                            quickOptionRow(icon: "flame.fill", title: "Exercise", color: .orange)
+                        }
+                    }
+                    .background(Color(.secondarySystemBackground))
+                    .cornerRadius(20, corners: [.topLeft, .topRight])
+                    
+                    // Cancel button area
+                    Color(.systemBackground)
+                        .frame(height: 80)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-            .buttonStyle(.plain)
+            
+            // Floating Button
+            if !showQuickAddMenu {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button {
+                            withAnimation(.spring(response: 0.3)) {
+                                showQuickAddMenu = true
+                            }
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.title2.bold())
+                                .foregroundColor(.white)
+                                .frame(width: 56, height: 56)
+                                .background(
+                                    Circle()
+                                        .fill(Color.blue)
+                                        .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
+                                )
+                        }
+                        .padding(.trailing, 20)
+                        .padding(.bottom, 20)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func quickActionButton(icon: String, title: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.title2)
+                    .foregroundColor(.white)
+                    .frame(width: 50, height: 50)
+                    .background(color)
+                    .cornerRadius(12)
+                
+                Text(title)
+                    .font(.caption)
+                    .foregroundColor(.primary)
+            }
+            .frame(width: 100)
+        }
+    }
+    
+    private func quickOptionRow(icon: String, title: String, color: Color) -> some View {
+        Button {
+            showQuickAddMenu = false
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.body)
+                    .foregroundColor(color)
+                    .frame(width: 24)
+                
+                Text(title)
+                    .font(.body)
+                    .foregroundColor(.primary)
+                
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+        }
+    }
+    
+    // MARK: - Helpers
+    
+    private func setupWeekDates() {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+
+        // Get the start of the week (Sunday)
+        let components = calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: today)
+        guard let startOfWeek = calendar.date(from: components) else { return }
+
+        weekDates = (0..<7).compactMap { offset in
+            calendar.date(byAdding: .day, value: offset, to: startOfWeek)
+        }
+    }
+
+    private func deleteFoodLog(_ log: FoodLog) {
+        modelContext.delete(log)
+        try? modelContext.save()
+    }
+    
+    private func requestCameraAndScan() {
+        Task {
+            cameraPermission.refresh()
+            if !cameraPermission.authorised {
+                await cameraPermission.request()
+            }
+            if cameraPermission.authorised {
+                showingScanSheet = true
+            } else {
+                showCameraDeniedAlert = true
+            }
+        }
+    }
+    
+    private func handleVoiceResult(_ result: VoiceDictationParsedResult) {
+        let name = result.foodName
+        let serving = result.servingInGrams ?? 100.0
+        
+        var cal = 0
+        var p = 0.0
+        var c = 0.0
+        var f = 0.0
+        
+        if let match = foodLogs.first(where: { $0.foodName.localizedCaseInsensitiveContains(name) }) {
+            let ratio = serving / match.servingSize
+            cal = Int(Double(match.calories) * ratio)
+            p = match.protein * ratio
+            c = match.carbs * ratio
+            f = match.fats * ratio
+        }
+        
+        let newEntry = FoodLog(
+            timestamp: selectedDate,
+            foodName: name,
+            servingSize: serving,
+            calories: cal,
+            protein: p,
+            carbs: c,
+            fats: f,
+            category: selectedMealForAdd
+        )
+        modelContext.insert(newEntry)
+        try? modelContext.save()
+    }
+}
+
+// Helper for rounded corners on specific sides
+extension View {
+    func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
+        clipShape(RoundedCorner(radius: radius, corners: corners))
+    }
+}
+
+struct RoundedCorner: Shape {
+    var radius: CGFloat = .infinity
+    var corners: UIRectCorner = .allCorners
+    
+    func path(in rect: CGRect) -> Path {
+        let path = UIBezierPath(
+            roundedRect: rect,
+            byRoundingCorners: corners,
+            cornerRadii: CGSize(width: radius, height: radius)
+        )
+        return Path(path.cgPath)
+    }
+}
+
+// MARK: - Cheat Meals Browser
+
+struct CheatMealsView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    
+    let mealCategory: MealCategory
+    let onLog: (FoodLog) -> Void
+    
+    @State private var selectedRestaurant: String?
+    @State private var searchText = ""
+    
+    var restaurants: [String] {
+        CheatMealDatabase.getRestaurants()
+    }
+    
+    var filteredMeals: [(name: String, calories: Int, protein: Double, carbs: Double, fats: Double, serving: Double, restaurant: String, category: CheatMealCategory)] {
+        var meals = CheatMealDatabase.allMeals
+        
+        if let restaurant = selectedRestaurant {
+            meals = meals.filter { $0.restaurant == restaurant }
+        }
+        
+        if !searchText.isEmpty {
+            meals = meals.filter { $0.name.localizedCaseInsensitiveContains(searchText) || $0.restaurant.localizedCaseInsensitiveContains(searchText) }
+        }
+        
+        return meals
+    }
+    
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                // Restaurant filter
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        FilterChip(title: "All", isSelected: selectedRestaurant == nil) {
+                            selectedRestaurant = nil
+                        }
+                        ForEach(restaurants, id: \.self) { restaurant in
+                            FilterChip(title: restaurant, isSelected: selectedRestaurant == restaurant) {
+                                selectedRestaurant = restaurant
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+                .padding(.vertical, 8)
+                .background(Color(.systemGroupedBackground))
+                
+                List {
+                    ForEach(filteredMeals, id: \.name) { meal in
+                        CheatMealRow(meal: meal) {
+                            logMeal(meal)
+                        }
+                    }
+                }
+            }
+            .searchable(text: $searchText, prompt: "Search meals...")
+            .navigationTitle("🍔 Cheat Meals")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+    }
+    
+    private func logMeal(_ meal: (name: String, calories: Int, protein: Double, carbs: Double, fats: Double, serving: Double, restaurant: String, category: CheatMealCategory)) {
+        let foodLog = FoodLog(
+            timestamp: Date(),
+            foodName: "\(meal.restaurant) - \(meal.name)",
+            servingSize: meal.serving,
+            calories: meal.calories,
+            protein: meal.protein,
+            carbs: meal.carbs,
+            fats: meal.fats,
+            category: mealCategory
+        )
+        
+        modelContext.insert(foodLog)
+        try? modelContext.save()
+        onLog(foodLog)
+        dismiss()
+    }
+}
+
+struct FilterChip: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.caption)
+                .fontWeight(isSelected ? .semibold : .regular)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(isSelected ? Color.accentColor : Color(.systemGray5))
+                .foregroundColor(isSelected ? .white : .primary)
+                .cornerRadius(16)
         }
     }
 }
 
-struct BadgeRibbon: View {
-    let badges: [AchievementBadge]
+struct CheatMealRow: View {
+    let meal: (name: String, calories: Int, protein: Double, carbs: Double, fats: Double, serving: Double, restaurant: String, category: CheatMealCategory)
+    let onTap: () -> Void
     
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(badges) { badge in
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(meal.name)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    Spacer()
+                    Text("\(meal.calories) kcal")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.orange)
+                }
+                
+                HStack {
+                    Text(meal.restaurant)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
                     HStack(spacing: 8) {
-                        Image(systemName: badge.icon)
-                            .foregroundColor(.orange)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(badge.title).font(.caption).bold()
-                            Text(badge.detail)
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                        }
+                        MacroBadge(label: "P", value: meal.protein, color: .blue)
+                        MacroBadge(label: "C", value: meal.carbs, color: .green)
+                        MacroBadge(label: "F", value: meal.fats, color: .orange)
                     }
-                    .padding(8)
-                    .background(Color(.secondarySystemBackground))
-                    .cornerRadius(10)
                 }
             }
             .padding(.vertical, 4)
@@ -2884,322 +4399,37 @@ struct BadgeRibbon: View {
     }
 }
 
-struct BudgetEditorSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @Bindable var profile: UserProfile
-    let onSave: () -> Void
-    
-    @State private var breakfastPct: Double
-    @State private var lunchPct: Double
-    @State private var dinnerPct: Double
-    @State private var snackPct: Double
-    
-    init(profile: UserProfile, onSave: @escaping () -> Void) {
-        _profile = Bindable(profile)
-        _breakfastPct = State(initialValue: profile.mealBudgetBreakfast * 100)
-        _lunchPct = State(initialValue: profile.mealBudgetLunch * 100)
-        _dinnerPct = State(initialValue: profile.mealBudgetDinner * 100)
-        _snackPct = State(initialValue: profile.mealBudgetSnack * 100)
-        self.onSave = onSave
-    }
-    
-    private var totalPct: Double { breakfastPct + lunchPct + dinnerPct + snackPct }
+struct MacroBadge: View {
+    let label: String
+    let value: Double
+    let color: Color
     
     var body: some View {
-        NavigationStack {
-            Form {
-                Section("Allocate your day") {
-                    budgetRow(title: "Breakfast", value: $breakfastPct)
-                    budgetRow(title: "Lunch", value: $lunchPct)
-                    budgetRow(title: "Dinner", value: $dinnerPct)
-                    budgetRow(title: "Snacks", value: $snackPct)
-                    
-                    HStack {
-                        Text("Total")
-                        Spacer()
-                        Text("\(Int(totalPct))%")
-                            .foregroundColor(abs(totalPct - 100) < 1 ? .green : .orange)
-                    }
-                }
-                
-                Section("Tip") {
-                    Text("Budgets always add to 100%. We’ll rebalance for you if they’re a little off.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .navigationTitle("Meal Budgets")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        NutritionManager.shared.applyMealBudgets(
-                            profile: profile,
-                            breakfast: breakfastPct / 100,
-                            lunch: lunchPct / 100,
-                            dinner: dinnerPct / 100,
-                            snack: snackPct / 100
-                        )
-                        onSave()
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-    
-    private func budgetRow(title: String, value: Binding<Double>) -> some View {
-        VStack(alignment: .leading) {
-            HStack {
-                Text(title)
-                Spacer()
-                Text("\(value.wrappedValue, specifier: "%.0f")%")
-                    .foregroundColor(.secondary)
-            }
-            Slider(value: value, in: 5...70, step: 1)
-        }
-    }
-}
-
-struct MealTemplateBuilderSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    let meal: MealCategory
-    let logs: [FoodLog]
-    let onSave: (String) -> Void
-    
-    @State private var name: String
-    
-    init(meal: MealCategory, logs: [FoodLog], onSave: @escaping (String) -> Void) {
-        self.meal = meal
-        self.logs = logs
-        self.onSave = onSave
-        _name = State(initialValue: "Usual \(meal.rawValue.capitalized)")
-    }
-    
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Name") {
-                    TextField("Template name", text: $name)
-                }
-                
-                Section("\(meal.rawValue.capitalized) items") {
-                    if logs.isEmpty {
-                        Text("Log this meal first, then save it as a template.")
-                            .foregroundColor(.secondary)
-                    } else {
-                        ForEach(logs) { log in
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    Text(log.foodName)
-                                    Text("\(Int(log.servingSize))g • \(log.calories) kcal")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                Spacer()
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Save Template")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        onSave(name.trimmingCharacters(in: .whitespacesAndNewlines))
-                        dismiss()
-                    }
-                    .disabled(logs.isEmpty || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-            }
-        }
-    }
-}
-
-private struct EditableIngredient: Identifiable {
-    let id = UUID()
-    var name: String
-    var amount: Double
-    var calories: Double
-    var protein: Double
-    var carbs: Double
-    var fats: Double
-}
-
-struct RecipeBuilderSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    let onSave: (Recipe) -> Void
-    
-    @State private var name: String = "New Recipe"
-    @State private var servings: Int = 1
-    @State private var ingredients: [EditableIngredient] = [
-        EditableIngredient(name: "Ingredient 1", amount: 100, calories: 100, protein: 0, carbs: 0, fats: 0)
-    ]
-    
-    private var totals: (cal: Double, protein: Double, carbs: Double, fats: Double) {
-        ingredients.reduce((0, 0, 0, 0)) { partial, ing in
-            (
-                partial.0 + ing.calories,
-                partial.1 + ing.protein,
-                partial.2 + ing.carbs,
-                partial.3 + ing.fats
-            )
-        }
-    }
-    
-    private var perServing: (cal: Double, protein: Double, carbs: Double, fats: Double) {
-        let divisor = max(1, Double(servings))
-        return (totals.cal / divisor, totals.protein / divisor, totals.carbs / divisor, totals.fats / divisor)
-    }
-    
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Recipe info") {
-                    TextField("Name", text: $name)
-                    Stepper("Servings: \(servings)", value: $servings, in: 1...20)
-                }
-                
-                Section("Ingredients") {
-                    ForEach($ingredients) { $ingredient in
-                        VStack(alignment: .leading, spacing: 8) {
-                            TextField("Name", text: $ingredient.name)
-                            HStack {
-                                Text("Amount (g/ml)")
-                                Spacer()
-                                TextField("100", value: $ingredient.amount, format: .number)
-                                    .multilineTextAlignment(.trailing)
-                                    .keyboardType(.decimalPad)
-                                    .frame(width: 80)
-                            }
-                            macroFields(for: $ingredient)
-                        }
-                    }
-                    .onDelete { indices in
-                        ingredients.remove(atOffsets: indices)
-                    }
-                    
-                    Button {
-                        ingredients.append(EditableIngredient(name: "Ingredient \(ingredients.count + 1)", amount: 100, calories: 50, protein: 0, carbs: 0, fats: 0))
-                    } label: {
-                        Label("Add ingredient", systemImage: "plus.circle")
-                    }
-                }
-                
-                Section("Per serving") {
-                    macroSummaryRow(label: "Calories", value: perServing.cal, suffix: "kcal")
-                    macroSummaryRow(label: "Protein", value: perServing.protein, suffix: "g")
-                    macroSummaryRow(label: "Carbs", value: perServing.carbs, suffix: "g")
-                    macroSummaryRow(label: "Fats", value: perServing.fats, suffix: "g")
-                }
-            }
-            .navigationTitle("Recipe Builder")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        let recipe = Recipe(name: name.trimmingCharacters(in: .whitespacesAndNewlines), servings: servings)
-                        for ing in ingredients {
-                            let part = RecipeIngredient(
-                                name: ing.name,
-                                amount: ing.amount,
-                                calories: Int(ing.calories.rounded()),
-                                protein: ing.protein,
-                                carbs: ing.carbs,
-                                fats: ing.fats,
-                                recipe: recipe
-                            )
-                            recipe.ingredients.append(part)
-                        }
-                        onSave(recipe)
-                        dismiss()
-                    }
-                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || ingredients.isEmpty)
-                }
-            }
-        }
-    }
-    
-    private func macroFields(for ingredient: Binding<EditableIngredient>) -> some View {
-        VStack(alignment: .leading) {
-            HStack {
-                Text("Calories")
-                Spacer()
-                TextField("100", value: ingredient.calories, format: .number)
-                    .multilineTextAlignment(.trailing)
-                    .keyboardType(.decimalPad)
-                    .frame(width: 80)
-            }
-            HStack {
-                Text("Protein (g)")
-                Spacer()
-                TextField("0", value: ingredient.protein, format: .number)
-                    .multilineTextAlignment(.trailing)
-                    .keyboardType(.decimalPad)
-                    .frame(width: 80)
-            }
-            HStack {
-                Text("Carbs (g)")
-                Spacer()
-                TextField("0", value: ingredient.carbs, format: .number)
-                    .multilineTextAlignment(.trailing)
-                    .keyboardType(.decimalPad)
-                    .frame(width: 80)
-            }
-            HStack {
-                Text("Fats (g)")
-                Spacer()
-                TextField("0", value: ingredient.fats, format: .number)
-                    .multilineTextAlignment(.trailing)
-                    .keyboardType(.decimalPad)
-                    .frame(width: 80)
-            }
-        }
-    }
-    
-    private func macroSummaryRow(label: String, value: Double, suffix: String) -> some View {
-        HStack {
+        HStack(spacing: 2) {
             Text(label)
-            Spacer()
-            Text("\(value, specifier: "%.1f") \(suffix)")
+                .font(.caption2)
+                .fontWeight(.bold)
+                .foregroundColor(color)
+            Text("\(Int(value))")
+                .font(.caption2)
                 .foregroundColor(.secondary)
         }
     }
 }
 
-struct BadgeShelfView: View {
-    @Environment(\.dismiss) private var dismiss
-    let badges: [AchievementBadge]
+struct FoodLogRow: View {
+    let log: FoodLog
     
     var body: some View {
-        NavigationStack {
-            List {
-                if badges.isEmpty {
-                    Text("No badges yet. Keep logging to unlock streaks and goals!")
-                        .foregroundColor(.secondary)
-                } else {
-                    ForEach(badges) { badge in
-                        HStack(spacing: 12) {
-                            Image(systemName: badge.icon)
-                                .foregroundColor(.orange)
-                            VStack(alignment: .leading) {
-                                Text(badge.title).bold()
-                                Text(badge.detail)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Text(badge.unlockedAt.formatted(date: .abbreviated, time: .omitted))
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
-            }
-            .navigationTitle("Badges")
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+        VStack(alignment: .leading) {
+            Text(log.foodName).font(.headline)
+            HStack {
+                Text("\(Int(log.servingSize))g")
+                Spacer()
+                Text("\(log.calories) kcal")
+                Text("P:\(Int(log.protein)) C:\(Int(log.carbs)) F:\(Int(log.fats))")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
         }
     }
@@ -3273,6 +4503,1515 @@ struct LogFoodEntryView: View {
     }
 }
 
+// MARK: - Quick Add Food Button (FAB)
+
+struct QuickAddFoodButton: View {
+    @Binding var showMenu: Bool
+    @Binding var selectedMeal: MealCategory
+    let onScanTapped: () -> Void
+    let onManualTapped: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            if showMenu {
+                // Meal category selector
+                VStack(spacing: 8) {
+                    ForEach(MealCategory.allCases, id: \.self) { category in
+                        Button {
+                            selectedMeal = category
+                        } label: {
+                            HStack {
+                                Image(systemName: category == selectedMeal ? "checkmark.circle.fill" : "circle")
+                                Text(category.rawValue.capitalized)
+                            }
+                            .font(.subheadline)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(category == selectedMeal ? Color.accentColor : Color(.systemGray5))
+                            .foregroundColor(category == selectedMeal ? .white : .primary)
+                            .cornerRadius(20)
+                        }
+                    }
+                }
+                .padding(12)
+                .background(.ultraThinMaterial)
+                .cornerRadius(16)
+                
+                // Action buttons
+                HStack(spacing: 12) {
+                    // Scan button
+                    Button(action: {
+                        withAnimation { showMenu = false }
+                        onScanTapped()
+                    }) {
+                        VStack(spacing: 4) {
+                            Image(systemName: "barcode.viewfinder")
+                                .font(.title2)
+                            Text("Scan")
+                                .font(.caption)
+                        }
+                        .frame(width: 60, height: 60)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(30)
+                        .shadow(radius: 4)
+                    }
+                    
+                    // Manual button
+                    Button(action: {
+                        withAnimation { showMenu = false }
+                        onManualTapped()
+                    }) {
+                        VStack(spacing: 4) {
+                            Image(systemName: "square.and.pencil")
+                                .font(.title2)
+                            Text("Manual")
+                                .font(.caption)
+                        }
+                        .frame(width: 60, height: 60)
+                        .background(Color.green)
+                        .foregroundColor(.white)
+                        .cornerRadius(30)
+                        .shadow(radius: 4)
+                    }
+                }
+            }
+            
+            // Main FAB
+            Button(action: {
+                withAnimation(.spring(response: 0.3)) {
+                    showMenu.toggle()
+                }
+            }) {
+                Image(systemName: showMenu ? "xmark" : "plus")
+                    .font(.title.weight(.semibold))
+                    .frame(width: 60, height: 60)
+                    .background(
+                        LinearGradient(
+                            colors: [Color.orange, Color.red],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .foregroundColor(.white)
+                    .cornerRadius(30)
+                    .shadow(color: .orange.opacity(0.4), radius: 8, x: 0, y: 4)
+            }
+            .rotationEffect(.degrees(showMenu ? 45 : 0))
+        }
+    }
+}
+
+// MARK: - Food Search Sheet
+
+struct FoodSearchSheet: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+
+    let mealCategory: MealCategory
+    var onFoodSelected: (String, Int, Double, Double, Double, Double) -> Void
+
+    @State private var searchQuery: String = ""
+    @State private var searchResults: [FoodSearchResult] = []
+    @State private var isSearching: Bool = false
+    @State private var debounceTask: Task<Void, Never>?
+    @State private var includeOnlineSearch: Bool = false
+    @State private var activeSearchToken: UUID?
+
+    private var searchService: FoodSearchService {
+        // Updated to use local backend instead of USDA
+        let backend = HTTPFoodBackendClient(baseURL: URL(string: "http://localhost:8000")!)
+        return FoodSearchService(context: modelContext, nutritionAPI: backend)
+    }
+
+    var body: some View {
+        ZStack {
+            Color.ironBackground.ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                header
+
+                if isSearching {
+                    loadingView
+                } else if !searchQuery.isEmpty && searchResults.isEmpty {
+                    emptyStateView
+                } else if !searchResults.isEmpty {
+                    resultsListView
+                } else {
+                    placeholderView
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+        .onChange(of: searchQuery) { _, newValue in
+            debounceTask?.cancel()
+            debounceTask = Task {
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                if Task.isCancelled { return }
+                await performSearch(newValue)
+            }
+        }
+    }
+
+    private var header: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Text("Search Foods")
+                    .font(.title2.bold())
+                    .foregroundColor(.white)
+
+                Spacer()
+
+                Button(action: { dismiss() }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.gray)
+                }
+            }
+
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(.gray)
+
+                TextField("Search for a food...", text: $searchQuery)
+                    .textFieldStyle(.plain)
+                    .foregroundColor(.white)
+                    .autocorrectionDisabled()
+
+                if !searchQuery.isEmpty {
+                    Button(action: {
+                        searchQuery = ""
+                        searchResults = []
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.gray)
+                    }
+                }
+            }
+            .padding(12)
+            .background(Color.ironCardDark)
+            .cornerRadius(12)
+
+            Toggle(isOn: $includeOnlineSearch) {
+                HStack(spacing: 8) {
+                    Image(systemName: includeOnlineSearch ? "wifi" : "wifi.slash")
+                        .foregroundColor(includeOnlineSearch ? .green : .gray)
+                    Text("Search online database")
+                        .font(.caption)
+                        .foregroundColor(.white)
+                }
+            }
+            .tint(.green)
+            .onChange(of: includeOnlineSearch) { _, _ in
+                if !searchQuery.isEmpty {
+                    debounceTask?.cancel()
+                    debounceTask = Task {
+                        try? await Task.sleep(nanoseconds: 100_000_000)
+                        if Task.isCancelled { return }
+                        await performSearch(searchQuery)
+                    }
+                }
+            }
+        }
+        .padding(Layout.padding)
+        .background(Color.ironBackground)
+    }
+
+    private var loadingView: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .scaleEffect(1.5)
+                .tint(.orange)
+
+            Text("Searching foods...")
+                .font(.subheadline)
+                .foregroundColor(.gray)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var emptyStateView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 48))
+                .foregroundColor(.gray)
+
+            Text("No results found")
+                .font(.headline)
+                .foregroundColor(.white)
+
+            Text("Try searching with a different term")
+                .font(.subheadline)
+                .foregroundColor(.gray)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var placeholderView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "fork.knife.circle")
+                .font(.system(size: 48))
+                .foregroundColor(.orange)
+
+            Text("Quick Food Search")
+                .font(.headline)
+                .foregroundColor(.white)
+
+            Text("Start typing to search your cache and online database")
+                .font(.subheadline)
+                .foregroundColor(.gray)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var resultsListView: some View {
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                ForEach(searchResults) { result in
+                    FoodSearchResultRow(result: result) {
+                        onFoodSelected(
+                            result.name,
+                            result.calories,
+                            result.protein,
+                            result.carbs,
+                            result.fats,
+                            result.servingSize
+                        )
+                        dismiss()
+                    }
+                }
+            }
+            .padding(Layout.padding)
+        }
+    }
+
+    private func performSearch(_ query: String) async {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 2 else {
+            await MainActor.run {
+                searchResults = []
+                isSearching = false
+            }
+            return
+        }
+        
+        let token = UUID()
+        activeSearchToken = token
+        
+        do {
+            let localResults = try await searchService.searchLocal(trimmed)
+            try Task.checkCancellation()
+            await MainActor.run {
+                guard activeSearchToken == token else { return }
+                searchResults = localResults
+                isSearching = false
+            }
+            
+            guard localResults.count < 5, await searchService.hasOnlineSource else {
+                return
+            }
+            
+            await MainActor.run { isSearching = true }
+            
+            let remote = try await searchService.searchRemote(trimmed)
+            try Task.checkCancellation()
+            await MainActor.run {
+                guard activeSearchToken == token else { return }
+                searchResults.append(contentsOf: remote)
+                isSearching = false
+            }
+        } catch is CancellationError {
+            await MainActor.run {
+                if activeSearchToken == token {
+                    isSearching = false
+                }
+            }
+        } catch {
+            await MainActor.run {
+                if activeSearchToken == token {
+                    searchResults = []
+                    isSearching = false
+                }
+            }
+        }
+    }
+}
+
+struct FoodSearchResultRow: View {
+    let result: FoodSearchResult
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        Text(result.name)
+                            .font(.body.weight(.medium))
+                            .foregroundColor(.white)
+                            .lineLimit(2)
+
+                        Spacer()
+
+                        sourceTag
+                    }
+
+                    if let brand = result.brand {
+                        Text(brand)
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+
+                    HStack(spacing: 16) {
+                        MacroValueLabel(value: result.calories, unit: "kcal", color: .orange)
+                        MacroValueLabel(value: Int(result.protein), unit: "P", color: .blue)
+                        MacroValueLabel(value: Int(result.carbs), unit: "C", color: .green)
+                        MacroValueLabel(value: Int(result.fats), unit: "F", color: .yellow)
+                    }
+                    .font(.caption)
+
+                    if let serving = result.servingDescription {
+                        Text("Serving: \(serving)")
+                            .font(.caption2)
+                            .foregroundColor(.gray)
+                    }
+                }
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+            .padding(16)
+            .background(Color.ironCardDark)
+            .cornerRadius(12)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var sourceTag: some View {
+        Text(sourceLabel)
+            .font(.caption2.weight(.medium))
+            .foregroundColor(sourceColor)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(sourceColor.opacity(0.15))
+            .cornerRadius(6)
+    }
+
+    private var sourceLabel: String {
+        switch result.source {
+        case .localCache: return "CACHED"
+        case .recentLogs: return "RECENT"
+        case .savedFoods: return "SAVED"
+        case .onlineAPI: return "ONLINE"
+        }
+    }
+
+    private var sourceColor: Color {
+        switch result.source {
+        case .localCache: return .blue
+        case .recentLogs: return .green
+        case .savedFoods: return .purple
+        case .onlineAPI: return .orange
+        }
+    }
+}
+
+struct MacroValueLabel: View {
+    let value: Int
+    let unit: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Text("\(value)")
+                .fontWeight(.semibold)
+            Text(unit)
+                .foregroundColor(.gray)
+        }
+        .foregroundColor(color)
+    }
+}
+
+// MARK: - Quick Add Food Sheet
+
+// MARK: - Edit Food Log Sheet
+
+struct EditFoodLogSheet: View {
+    @Bindable var foodLog: FoodLog
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var showDeleteConfirmation = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Food Details") {
+                    HStack {
+                        Text("Name")
+                        Spacer()
+                        TextField("Food name", text: $foodLog.foodName)
+                            .multilineTextAlignment(.trailing)
+                    }
+
+                    HStack {
+                        Text("Serving Size")
+                        Spacer()
+                        TextField("g", value: $foodLog.servingSize, format: .number)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                        Text("g")
+                            .foregroundColor(.secondary)
+                    }
+
+                    Picker("Meal", selection: $foodLog.category) {
+                        ForEach(MealCategory.allCases, id: \.self) { category in
+                            Text(category.rawValue.capitalized).tag(category)
+                        }
+                    }
+                }
+
+                Section("Nutrition") {
+                    HStack {
+                        Text("Calories")
+                        Spacer()
+                        TextField("kcal", value: $foodLog.calories, format: .number)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                        Text("kcal")
+                            .foregroundColor(.secondary)
+                    }
+
+                    HStack {
+                        Text("Protein")
+                        Spacer()
+                        TextField("g", value: $foodLog.protein, format: .number)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                        Text("g")
+                            .foregroundColor(.secondary)
+                    }
+
+                    HStack {
+                        Text("Carbs")
+                        Spacer()
+                        TextField("g", value: $foodLog.carbs, format: .number)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                        Text("g")
+                            .foregroundColor(.secondary)
+                    }
+
+                    HStack {
+                        Text("Fats")
+                        Spacer()
+                        TextField("g", value: $foodLog.fats, format: .number)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                        Text("g")
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Section {
+                    Button(role: .destructive) {
+                        showDeleteConfirmation = true
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Text("Delete Food Entry")
+                            Spacer()
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Edit Food")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        try? modelContext.save()
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+            .alert("Delete Food Entry?", isPresented: $showDeleteConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive) {
+                    modelContext.delete(foodLog)
+                    try? modelContext.save()
+                    dismiss()
+                }
+            } message: {
+                Text("This action cannot be undone.")
+            }
+        }
+    }
+}
+
+// MARK: - Quick Add Food Sheet
+
+struct QuickAddFoodSheet: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+
+    let mealCategory: MealCategory
+    let selectedDate: Date
+    
+    @State private var foodName: String = ""
+    @State private var calories: String = ""
+    @State private var protein: String = ""
+    @State private var carbs: String = ""
+    @State private var fats: String = ""
+    @State private var servingSize: String = "100"
+    
+    @Query(sort: \FoodLog.timestamp, order: .reverse) private var recentLogs: [FoodLog]
+    @Query(sort: \FoodItem.name, order: .forward) private var savedFoods: [FoodItem]
+    
+    @State private var showScanSheet = false
+    @State private var showVoiceSheet = false
+    @State private var showSearchSheet = false
+    
+    var recentFoods: [FoodLog] {
+        // Get unique food names from last 20 logs
+        var seen = Set<String>()
+        return recentLogs.prefix(50).filter { log in
+            if seen.contains(log.foodName) { return false }
+            seen.insert(log.foodName)
+            return true
+        }.prefix(10).map { $0 }
+    }
+    
+    var frequentFoods: [FoodItem] {
+        Array(savedFoods.prefix(8))
+    }
+    
+    var body: some View {
+        ZStack {
+            Color.ironBackground.ignoresSafeArea()
+            
+            ScrollView {
+                VStack(spacing: 24) {
+                    header
+                    
+                    quickActions
+                    
+                    if !recentFoods.isEmpty {
+                        foodListCard(
+                            title: "Recent",
+                            subtitle: "Last foods you logged",
+                            foods: recentFoods.map {
+                                FoodShortcut(
+                                    name: $0.foodName,
+                                    detail: "\(Int($0.servingSize))g • \($0.calories) kcal",
+                                    calories: $0.calories,
+                                    protein: $0.protein,
+                                    carbs: $0.carbs,
+                                    fats: $0.fats,
+                                    serving: $0.servingSize
+                                )
+                            }
+                        )
+                    }
+                    
+                    if !frequentFoods.isEmpty {
+                        foodListCard(
+                            title: "Frequent",
+                            subtitle: "Foods you created",
+                            foods: frequentFoods.map {
+                                FoodShortcut(
+                                    name: $0.name,
+                                    detail: "\(Int($0.defaultServingSize))g • \($0.calories) kcal",
+                                    calories: $0.calories,
+                                    protein: $0.protein,
+                                    carbs: $0.carbs,
+                                    fats: $0.fats,
+                                    serving: $0.defaultServingSize
+                                )
+                            }
+                        )
+                    }
+                    
+                    quickEntryCard
+                }
+                .padding(.vertical, 24)
+                .padding(.horizontal, Layout.padding)
+            }
+            .background(Color.clear)
+        }
+        .preferredColorScheme(.dark)
+        .sheet(isPresented: $showScanSheet) {
+            FoodScanSheet(selectedMealCategory: mealCategory) { }
+        }
+        .sheet(isPresented: $showVoiceSheet) {
+            VoiceDictationSheet { parsedResult in
+                foodName = parsedResult.foodName
+                if let grams = parsedResult.servingInGrams {
+                    servingSize = String(Int(grams.rounded()))
+                }
+
+                // Auto-fill nutrition data from recent or saved foods
+                autoFillNutritionData(for: parsedResult.foodName)
+            }
+        }
+        .sheet(isPresented: $showSearchSheet) {
+            FoodSearchSheet(mealCategory: mealCategory) { name, cal, p, c, f, serving in
+                logFood(
+                    name: name,
+                    cal: cal,
+                    p: p,
+                    c: c,
+                    f: f,
+                    serving: serving
+                )
+            }
+        }
+    }
+    
+    private func logFood(name: String, cal: Int, p: Double, c: Double, f: Double, serving: Double) {
+        let entry = FoodLog(
+            timestamp: selectedDate,
+            foodName: name,
+            servingSize: serving,
+            calories: cal,
+            protein: p,
+            carbs: c,
+            fats: f,
+            category: mealCategory
+        )
+        modelContext.insert(entry)
+        try? modelContext.save()
+        dismiss()
+    }
+
+    private func autoFillNutritionData(for foodName: String) {
+        let normalizedSearch = foodName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // First, try to find in recent logs (case-insensitive)
+        if let matchingLog = recentLogs.first(where: {
+            $0.foodName.lowercased().contains(normalizedSearch) ||
+            normalizedSearch.contains($0.foodName.lowercased())
+        }) {
+            calories = String(matchingLog.calories)
+            protein = String(format: "%.1f", matchingLog.protein)
+            carbs = String(format: "%.1f", matchingLog.carbs)
+            fats = String(format: "%.1f", matchingLog.fats)
+            return
+        }
+
+        // Next, try to find in saved foods (case-insensitive)
+        if let matchingFood = savedFoods.first(where: {
+            $0.name.lowercased().contains(normalizedSearch) ||
+            normalizedSearch.contains($0.name.lowercased())
+        }) {
+            calories = String(matchingFood.calories)
+            protein = String(format: "%.1f", matchingFood.protein)
+            carbs = String(format: "%.1f", matchingFood.carbs)
+            fats = String(format: "%.1f", matchingFood.fats)
+            return
+        }
+    }
+
+    // MARK: - Themed Subviews
+    
+    private var header: some View {
+        HStack {
+            Button("Cancel") { dismiss() }
+                .font(.headline)
+                .foregroundColor(.ironTextPrimary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color.white.opacity(0.08))
+                .cornerRadius(16)
+            
+            Spacer()
+            
+            Text("Add to \(mealCategory.rawValue.capitalized)")
+                .font(.headline)
+                .foregroundColor(.ironTextPrimary)
+            
+            Spacer()
+            
+            Circle()
+                .fill(Color.ironCardBg)
+                .frame(width: 36, height: 36)
+                .overlay(Image(systemName: "flame.fill").foregroundColor(.ironWarning))
+        }
+    }
+    
+    private var quickActions: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                QuickActionButton(
+                    title: "Search",
+                    systemImage: "magnifyingglass",
+                    gradient: LinearGradient(colors: [.blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)
+                ) {
+                    showSearchSheet = true
+                }
+
+                QuickActionButton(
+                    title: "Scan",
+                    systemImage: "barcode.viewfinder",
+                    gradient: LinearGradient(colors: [.ironWarning, .orange], startPoint: .topLeading, endPoint: .bottomTrailing)
+                ) {
+                    showScanSheet = true
+                }
+            }
+
+            HStack(spacing: 12) {
+                QuickActionButton(
+                    title: "Voice",
+                    systemImage: "mic.fill",
+                    gradient: LinearGradient(colors: [.ironSuccess, .green], startPoint: .topLeading, endPoint: .bottomTrailing)
+                ) {
+                    showVoiceSheet = true
+                }
+
+                QuickActionButton(
+                    title: "Manual",
+                    systemImage: "pencil",
+                    gradient: LinearGradient(colors: [.gray, .secondary], startPoint: .topLeading, endPoint: .bottomTrailing)
+                ) {
+                    // Manual entry is already visible - this button just focuses on the entry card
+                    // The user can directly edit the fields below
+                }
+            }
+        }
+    }
+    
+    private func foodListCard(title: String, subtitle: String, foods: [FoodShortcut]) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundColor(.ironTextPrimary)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundColor(.ironTextSecondary)
+            }
+            
+            ForEach(foods) { shortcut in
+                Button {
+                    logFood(
+                        name: shortcut.name,
+                        cal: shortcut.calories,
+                        p: shortcut.protein,
+                        c: shortcut.carbs,
+                        f: shortcut.fats,
+                        serving: shortcut.serving
+                    )
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(shortcut.name)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(.ironTextPrimary)
+                            Text(shortcut.detail)
+                                .font(.caption)
+                                .foregroundColor(.ironTextSecondary)
+                        }
+                        Spacer()
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title3)
+                            .foregroundColor(.ironWarning)
+                    }
+                    .padding(.vertical, 4)
+                }
+                
+                if shortcut.id != foods.last?.id {
+                    Divider().background(Color.white.opacity(0.1))
+                }
+            }
+        }
+        .padding(20)
+        .ironGlassCard()
+    }
+    
+    private var quickEntryCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Quick Entry")
+                .font(.headline)
+                .foregroundColor(.ironTextPrimary)
+            
+            entryField("Food name", text: $foodName, placeholder: "e.g. Chicken Breast")
+            
+            HStack(spacing: 12) {
+                entryField("Serving (g)", text: $servingSize, keyboard: .numberPad)
+                entryField("Calories", text: $calories, keyboard: .numberPad)
+            }
+            
+            HStack(spacing: 12) {
+                entryField("Protein", text: $protein, keyboard: .decimalPad)
+                entryField("Carbs", text: $carbs, keyboard: .decimalPad)
+                entryField("Fats", text: $fats, keyboard: .decimalPad)
+            }
+            
+            Button {
+                logFood(
+                    name: foodName,
+                    cal: Int(calories) ?? 0,
+                    p: Double(protein) ?? 0,
+                    c: Double(carbs) ?? 0,
+                    f: Double(fats) ?? 0,
+                    serving: Double(servingSize) ?? 100
+                )
+            } label: {
+                Text("Add to \(mealCategory.rawValue.capitalized)")
+            }
+            .ironPrimaryButton()
+            .disabled(foodName.isEmpty)
+            .opacity(foodName.isEmpty ? 0.5 : 1)
+        }
+        .padding(20)
+        .ironGlassCard()
+    }
+    
+    private func entryField(_ title: String, text: Binding<String>, placeholder: String = "0", keyboard: UIKeyboardType = .default) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.ironTextSecondary)
+            TextField(placeholder, text: text)
+                .keyboardType(keyboard)
+                .textInputAutocapitalization(.never)
+                .disableAutocorrection(true)
+                .padding()
+                .background(Color.white.opacity(0.05))
+                .cornerRadius(12)
+                .foregroundColor(.ironTextPrimary)
+        }
+    }
+    
+    private struct FoodShortcut: Identifiable, Equatable {
+        let id = UUID()
+        let name: String
+        let detail: String
+        let calories: Int
+        let protein: Double
+        let carbs: Double
+        let fats: Double
+        let serving: Double
+    }
+    
+    private struct QuickActionButton: View {
+        let title: String
+        let systemImage: String
+        let gradient: LinearGradient
+        let action: () -> Void
+        
+        var body: some View {
+            Button(action: action) {
+                VStack(spacing: 8) {
+                    Image(systemName: systemImage)
+                        .font(.title2)
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(gradient)
+                .cornerRadius(Layout.cornerRadius)
+                .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 6)
+            }
+        }
+    }
+}
+
+// MARK: - Voice Dictation
+
+struct VoiceDictationParsedResult {
+    let transcript: String
+    let foodName: String
+    let servingInGrams: Double?
+}
+
+enum VoiceDictationParser {
+    static func parse(_ text: String) -> VoiceDictationParsedResult? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        
+        let pattern = #"(\d+\.?\d*)\s*(g|grams?|kg|kilograms?|ml|milliliters?|oz|ounces?|cups?|cup|tbsp|tablespoons?|tsp|teaspoons?|pieces?)?\s+(.+)"#
+        if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) {
+            let nsRange = NSRange(trimmed.startIndex..<trimmed.endIndex, in: trimmed)
+            if let match = regex.firstMatch(in: trimmed, options: [], range: nsRange),
+               let amountRange = Range(match.range(at: 1), in: trimmed),
+               let amount = Double(trimmed[amountRange]),
+               let foodRange = Range(match.range(at: 3), in: trimmed) {
+                
+                var unit: String? = nil
+                if match.range(at: 2).location != NSNotFound,
+                   let unitRange = Range(match.range(at: 2), in: trimmed) {
+                    unit = String(trimmed[unitRange]).lowercased()
+                }
+                
+                let grams = convertToGrams(amount: amount, unit: unit)
+                let foodName = String(trimmed[foodRange]).trimmingCharacters(in: .whitespaces)
+                
+                return VoiceDictationParsedResult(
+                    transcript: trimmed,
+                    foodName: foodName,
+                    servingInGrams: grams
+                )
+            }
+        }
+        
+        return VoiceDictationParsedResult(transcript: trimmed, foodName: trimmed, servingInGrams: nil)
+    }
+    
+    private static func convertToGrams(amount: Double, unit: String?) -> Double {
+        guard let unit = unit else { return amount }
+        
+        switch unit {
+        case "g", "gram", "grams": return amount
+        case "kg", "kilogram", "kilograms": return amount * 1000
+        case "ml", "milliliter", "milliliters": return amount
+        case "oz", "ounce", "ounces": return amount * 28.3495
+        case "cup", "cups": return amount * 240
+        case "tbsp", "tablespoon", "tablespoons": return amount * 15
+        case "tsp", "teaspoon", "teaspoons": return amount * 5
+        default: return amount
+        }
+    }
+}
+
+@MainActor
+final class VoiceDictationViewModel: ObservableObject {
+    enum State: Equatable {
+        case idle
+        case requestingPermission
+        case listening
+        case finished
+        case error(String)
+        
+        static func == (lhs: State, rhs: State) -> Bool {
+            switch (lhs, rhs) {
+            case (.idle, .idle), (.requestingPermission, .requestingPermission),
+                 (.listening, .listening), (.finished, .finished):
+                return true
+            case (.error(let l), .error(let r)):
+                return l == r
+            default:
+                return false
+            }
+        }
+    }
+    
+    @Published var state: State = .idle
+    @Published var transcript: String = ""
+    
+    private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
+    private var recognitionTask: SFSpeechRecognitionTask?
+    private let audioEngine = AVAudioEngine()
+    private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: Locale.current.identifier))
+    
+    func startRecording() {
+        Task { await requestPermissionsAndStart() }
+    }
+    
+    func stopRecording() {
+        audioEngine.stop()
+        audioEngine.inputNode.removeTap(onBus: 0)
+        recognitionRequest?.endAudio()
+        recognitionTask?.cancel()
+        recognitionTask = nil
+        recognitionRequest = nil
+        
+        if !transcript.isEmpty {
+            state = .finished
+        } else {
+            state = .idle
+        }
+    }
+    
+    func reset() {
+        stopRecording()
+        transcript = ""
+        state = .idle
+    }
+    
+    private func requestPermissionsAndStart() async {
+        state = .requestingPermission
+        
+        let speechStatus = await withCheckedContinuation { continuation in
+            SFSpeechRecognizer.requestAuthorization { status in
+                continuation.resume(returning: status)
+            }
+        }
+        
+        guard speechStatus == .authorized else {
+            state = .error("Speech permission denied")
+            return
+        }
+        
+        let micGranted = await withCheckedContinuation { continuation in
+            AVAudioApplication.requestRecordPermission { granted in
+                continuation.resume(returning: granted)
+            }
+        }
+        
+        guard micGranted else {
+            state = .error("Microphone permission denied")
+            return
+        }
+        
+        do {
+            try startRecognition()
+        } catch {
+            state = .error("Could not start audio: \(error.localizedDescription)")
+        }
+    }
+    
+    private func startRecognition() throws {
+        recognitionTask?.cancel()
+        recognitionTask = nil
+        transcript = ""
+        
+        let audioSession = AVAudioSession.sharedInstance()
+        try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
+        try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+        
+        recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
+        guard let recognitionRequest = recognitionRequest else {
+            throw NSError(domain: "VoiceDictation", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create request"])
+        }
+        
+        recognitionRequest.shouldReportPartialResults = true
+        
+        let inputNode = audioEngine.inputNode
+        let recordingFormat = inputNode.outputFormat(forBus: 0)
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
+            recognitionRequest.append(buffer)
+        }
+        
+        audioEngine.prepare()
+        try audioEngine.start()
+        
+        recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+            guard let self = self else { return }
+            
+            if let result = result {
+                Task { @MainActor in
+                    self.transcript = result.bestTranscription.formattedString
+                    if result.isFinal {
+                        self.stopRecording()
+                    }
+                }
+            }
+            
+            if let error = error {
+                Task { @MainActor in
+                    self.stopRecording()
+                    self.state = .error(error.localizedDescription)
+                }
+            }
+        }
+        
+        state = .listening
+    }
+}
+
+struct VoiceDictationSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var viewModel = VoiceDictationViewModel()
+    @State private var parseMessage: String?
+    
+    let onResult: (VoiceDictationParsedResult) -> Void
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.ironBackground.ignoresSafeArea()
+                
+                VStack(spacing: 24) {
+                    Text("Talk through your meal")
+                        .font(.headline)
+                        .foregroundColor(.ironTextPrimary)
+                    
+                    Text("Example: \"250 grams chicken breast\" or \"100g oatmeal\"")
+                        .font(.caption)
+                        .foregroundColor(.ironTextSecondary)
+                        .multilineTextAlignment(.center)
+                    
+                    VStack(spacing: 16) {
+                        Image(systemName: iconName)
+                            .font(.system(size: 80))
+                            .foregroundColor(iconColor)
+                            .scaleEffect(viewModel.state == .listening ? 1.05 : 1)
+                            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: viewModel.state == .listening)
+                        
+                        Text(statusText)
+                            .font(.title3)
+                            .foregroundColor(.ironTextPrimary)
+                    }
+                    .padding(.top, 20)
+                    
+                    if !viewModel.transcript.isEmpty {
+                        Text(viewModel.transcript)
+                            .font(.body)
+                            .foregroundColor(.ironTextPrimary)
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                            .background(Color.white.opacity(0.05))
+                            .cornerRadius(16)
+                    }
+                    
+                    if let parseMessage = parseMessage {
+                        Text(parseMessage)
+                            .font(.caption)
+                            .foregroundColor(.ironWarning)
+                    }
+                    
+                    Spacer()
+                    
+                    VStack(spacing: 12) {
+                        Button(action: toggleRecording) {
+                            Text(viewModel.state == .listening ? "Stop Recording" : "Start Recording")
+                                .font(.headline)
+                        }
+                        .ironPrimaryButton()
+                        
+                        Button {
+                            useTranscript()
+                        } label: {
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text("Use This Entry")
+                            }
+                            .font(.headline)
+                        }
+                        .ironGlassCard()
+                        .disabled(viewModel.transcript.isEmpty)
+                        .opacity(viewModel.transcript.isEmpty ? 0.4 : 1)
+                    }
+                }
+                .padding(Layout.padding)
+            }
+            .preferredColorScheme(.dark)
+            .onDisappear { viewModel.stopRecording() }
+            .navigationTitle("Voice Logging")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        viewModel.stopRecording()
+                        dismiss()
+                    }
+                    .foregroundColor(.ironTextPrimary)
+                }
+            }
+        }
+    }
+    
+    private var statusText: String {
+        switch viewModel.state {
+        case .idle: return "Ready when you are"
+        case .requestingPermission: return "Requesting permission..."
+        case .listening: return "Listening..."
+        case .finished: return "Tap Use to apply"
+        case .error(let message): return message
+        }
+    }
+    
+    private var iconName: String {
+        switch viewModel.state {
+        case .idle, .requestingPermission: return "mic.circle.fill"
+        case .listening: return "waveform.circle.fill"
+        case .finished: return "checkmark.circle.fill"
+        case .error: return "exclamationmark.circle.fill"
+        }
+    }
+    
+    private var iconColor: Color {
+        switch viewModel.state {
+        case .idle, .requestingPermission: return .ironTextSecondary
+        case .listening: return .ironWarning
+        case .finished: return .ironSuccess
+        case .error: return .ironError
+        }
+    }
+    
+    private func toggleRecording() {
+        if viewModel.state == .listening {
+            viewModel.stopRecording()
+        } else {
+            viewModel.startRecording()
+        }
+    }
+    
+    private func useTranscript() {
+        guard let parsed = VoiceDictationParser.parse(viewModel.transcript) else {
+            parseMessage = "Couldn't understand that. Try including an amount like \"150g\"."
+            return
+        }
+        
+        onResult(parsed)
+        dismiss()
+    }
+}
+
+// MARK: - App Intents for Siri & Shortcuts (iOS 16+)
+
+import AppIntents
+
+/// App Intent for logging food via Siri or Shortcuts
+@available(iOS 16.0, *)
+struct LogFoodIntent: AppIntent {
+    static var title: LocalizedStringResource = "Log Food"
+    static var description = IntentDescription("Quickly log a food item to your nutrition diary")
+    
+    // Opens app when invoked
+    static var openAppWhenRun: Bool = true
+    
+    @Parameter(title: "Food Name")
+    var foodName: String?
+    
+    @Parameter(title: "Calories")
+    var calories: Int?
+    
+@Parameter(title: "Meal")
+var meal: MealCategoryEntity?
+    
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        // This will open the app to the nutrition section
+        // The actual food logging happens in the app UI
+        return .result(dialog: "Opening IronFuel to log \(foodName ?? "food")...")
+    }
+}
+
+/// Entity for meal category selection in Shortcuts
+@available(iOS 16.0, *)
+struct MealCategoryEntity: AppEntity {
+    var id: String
+    var name: String
+    
+    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Meal"
+    static var defaultQuery = MealCategoryQuery()
+    
+    var displayRepresentation: DisplayRepresentation {
+        DisplayRepresentation(title: "\(name)")
+    }
+    
+    static let breakfast = MealCategoryEntity(id: "breakfast", name: "Breakfast")
+    static let lunch = MealCategoryEntity(id: "lunch", name: "Lunch")
+    static let dinner = MealCategoryEntity(id: "dinner", name: "Dinner")
+    static let snack = MealCategoryEntity(id: "snack", name: "Snack")
+    
+    static let allCases: [MealCategoryEntity] = [.breakfast, .lunch, .dinner, .snack]
+}
+
+@available(iOS 16.0, *)
+struct MealCategoryQuery: EntityQuery {
+    func entities(for identifiers: [String]) async throws -> [MealCategoryEntity] {
+        MealCategoryEntity.allCases.filter { identifiers.contains($0.id) }
+    }
+    
+    func suggestedEntities() async throws -> [MealCategoryEntity] {
+        MealCategoryEntity.allCases
+    }
+}
+
+/// Quick scan intent
+@available(iOS 16.0, *)
+struct ScanFoodIntent: AppIntent {
+    static var title: LocalizedStringResource = "Scan Food Barcode"
+    static var description = IntentDescription("Open the barcode scanner to log food")
+    static var openAppWhenRun: Bool = true
+    
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        return .result(dialog: "Opening barcode scanner...")
+    }
+}
+
+/// App Shortcuts provider - makes shortcuts available in Shortcuts app & Spotlight
+@available(iOS 16.0, *)
+struct IronFuelShortcuts: AppShortcutsProvider {
+    static var appShortcuts: [AppShortcut] {
+        AppShortcut(
+            intent: LogFoodIntent(),
+            phrases: [
+                "Log food in \(.applicationName)",
+                "Add food to \(.applicationName)",
+                "Track meal in \(.applicationName)",
+                "Log my meal in \(.applicationName)"
+            ],
+            shortTitle: "Log Food",
+            systemImageName: "fork.knife"
+        )
+        
+        AppShortcut(
+            intent: ScanFoodIntent(),
+            phrases: [
+                "Scan food in \(.applicationName)",
+                "Scan barcode with \(.applicationName)"
+            ],
+            shortTitle: "Scan Barcode",
+            systemImageName: "barcode.viewfinder"
+        )
+    }
+}
+
+// MARK: - Lock Screen Widget (WidgetKit)
+// Note: This code needs to be in a separate Widget Extension target in Xcode
+// The following is the complete widget code to add to your Widget Extension
+
+/*
+ * ===== WIDGET EXTENSION CODE =====
+ * Create a new Widget Extension target in Xcode and add this code:
+ * File: IronFuelWidget.swift
+ */
+
+import WidgetKit
+
+// Widget Entry - the data displayed on the widget
+struct NutritionWidgetEntry: TimelineEntry {
+    let date: Date
+    let caloriesConsumed: Int
+    let caloriesTarget: Int
+    let proteinConsumed: Double
+    let proteinTarget: Int
+    
+    var caloriesRemaining: Int { max(0, caloriesTarget - caloriesConsumed) }
+    var proteinRemaining: Double { max(0, Double(proteinTarget) - proteinConsumed) }
+    var calorieProgress: Double { caloriesTarget > 0 ? min(1, Double(caloriesConsumed) / Double(caloriesTarget)) : 0 }
+    var proteinProgress: Double { proteinTarget > 0 ? min(1, proteinConsumed / Double(proteinTarget)) : 0 }
+}
+
+// Widget Timeline Provider
+struct NutritionWidgetProvider: TimelineProvider {
+    typealias Entry = NutritionWidgetEntry
+    
+    func placeholder(in context: Context) -> NutritionWidgetEntry {
+        NutritionWidgetEntry(
+            date: Date(),
+            caloriesConsumed: 1200,
+            caloriesTarget: 2000,
+            proteinConsumed: 80,
+            proteinTarget: 150
+        )
+    }
+    
+    func getSnapshot(in context: Context, completion: @escaping (NutritionWidgetEntry) -> Void) {
+        // For preview, use placeholder data
+        completion(placeholder(in: context))
+    }
+    
+    func getTimeline(in context: Context, completion: @escaping (Timeline<NutritionWidgetEntry>) -> Void) {
+        // In a real implementation, fetch from App Group shared container
+        // For now, use sample data
+        let entry = NutritionWidgetEntry(
+            date: Date(),
+            caloriesConsumed: 1200,
+            caloriesTarget: 2000,
+            proteinConsumed: 80,
+            proteinTarget: 150
+        )
+        
+        // Refresh every 15 minutes
+        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: Date())!
+        let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
+        completion(timeline)
+    }
+}
+
+// Lock Screen Widget Views
+struct NutritionLockScreenWidget: View {
+    let entry: NutritionWidgetEntry
+    @Environment(\.widgetFamily) var family
+    
+    var body: some View {
+        switch family {
+        case .accessoryCircular:
+            // Circular lock screen widget
+            Gauge(value: entry.calorieProgress) {
+                Text("Cal")
+                    .font(.caption2)
+            } currentValueLabel: {
+                Text("\(entry.caloriesRemaining)")
+                    .font(.caption)
+            }
+            .gaugeStyle(.accessoryCircularCapacity)
+            
+        case .accessoryRectangular:
+            // Rectangular lock screen widget
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Image(systemName: "flame.fill")
+                    Text("\(entry.caloriesRemaining) cal left")
+                        .font(.headline)
+                }
+                
+                HStack {
+                    Image(systemName: "bolt.fill")
+                    Text("\(Int(entry.proteinRemaining))g protein left")
+                        .font(.caption)
+                }
+                
+                ProgressView(value: entry.calorieProgress)
+                    .tint(.orange)
+            }
+            
+        case .accessoryInline:
+            // Inline widget (single line on lock screen)
+            Label("\(entry.caloriesRemaining) cal • \(Int(entry.proteinRemaining))g protein", systemImage: "fork.knife")
+            
+        default:
+            Text("IronFuel")
+        }
+    }
+}
+
+// Widget Definition
+struct IronFuelWidget: Widget {
+    let kind: String = "IronFuelWidget"
+    
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: NutritionWidgetProvider()) { entry in
+            NutritionLockScreenWidget(entry: entry)
+        }
+        .configurationDisplayName("Nutrition Tracker")
+        .description("Track your remaining calories and protein from your lock screen.")
+        .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryInline])
+    }
+}
+
+// MARK: - URL Scheme Handler for Widget Deep Links
+
+extension ContentView {
+    /// Handle deep links from widgets/shortcuts
+    func handleDeepLink(_ url: URL) {
+        guard url.scheme == "ironfuel" else { return }
+        
+        switch url.host {
+        case "addFood":
+            // Navigate to nutrition tab and show quick add
+            // This would set selectedTab = 2 and trigger the quick add sheet
+            break
+        case "scanFood":
+            // Navigate to nutrition tab and show scanner
+            break
+        default:
+            break
+        }
+    }
+}
+
 // MARK: - 10) SwiftData Container / App Entry (include module models)
 
 @main
@@ -3284,19 +6023,18 @@ struct IronFuelApp: App {
             WeightLog.self,
             FoodItem.self,
             FoodLog.self,
-            MealTemplate.self,
-            MealTemplateItem.self,
-            Recipe.self,
-            RecipeIngredient.self,
-            AchievementBadge.self,
-            GenericFood.self,
             WorkoutSession.self,
             WorkoutExercise.self,
             ExerciseSet.self,
             
             // Module models
             FoodProduct.self,
-            UserFoodDefault.self
+            UserFoodDefault.self,
+            
+            // Weightlifting models
+            GymLocation.self,
+            Exercise.self,
+            DailyConfirmation.self
         ])
         return try! ModelContainer(for: schema)
     }()
@@ -3304,7 +6042,428 @@ struct IronFuelApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .onAppear {
+                    // Seed cheat meals database on first launch
+                    let context = container.mainContext
+                    CheatMealDatabase.seedDatabase(context: context)
+                    SeedData.seedAll(context: context)
+                }
+                .onOpenURL { url in
+                    // Handle deep links from widgets
+                    handleDeepLink(url)
+                }
         }
         .modelContainer(container)
+    }
+    
+    private func handleDeepLink(_ url: URL) {
+        // Widget/Shortcut deep link handling
+        // ironfuel://addFood, ironfuel://scanFood
+        print("Deep link received: \(url)")
+    }
+}
+
+// MARK: - Glassmorphism Card
+
+struct GlassCardView: View {
+    let title: String
+    let subtitle: String
+    let caloriesLeft: Int
+    let caloriesDetail: String
+    let progress: Double
+    let macroItems: [(label: String, amount: String, color: Color)]
+    
+    private var progressTrim: Double {
+        min(max(progress, 0), 1)
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundColor(.white.opacity(0.85))
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.6))
+            }
+            
+            HStack {
+                ZStack {
+                    Circle()
+                        .stroke(Color.white.opacity(0.15), lineWidth: 10)
+                    
+                    Circle()
+                        .trim(from: 0, to: progressTrim)
+                        .stroke(
+                            LinearGradient(
+                                colors: [.blue, .purple],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                        )
+                        .rotationEffect(.degrees(-90))
+                    
+                    VStack(spacing: 2) {
+                        Text("\(caloriesLeft)")
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                        Text("kcal left")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.7))
+                        Text(caloriesDetail)
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                }
+                .frame(width: 130, height: 130)
+                
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 15) {
+                    ForEach(Array(macroItems.enumerated()), id: \.offset) { _, macro in
+                        MacroView(label: macro.label, amount: macro.amount, color: macro.color)
+                    }
+                }
+            }
+        }
+        .padding(20)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color(.sRGB, red: 30/255, green: 30/255, blue: 40/255, opacity: 0.9),
+                    Color(.sRGB, red: 18/255, green: 18/255, blue: 26/255, opacity: 0.7)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .overlay(.ultraThinMaterial.opacity(0.4))
+        )
+        .cornerRadius(20)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(
+                    LinearGradient(
+                        colors: [.white.opacity(0.2), .clear],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+        .shadow(color: .black.opacity(0.2), radius: 12, x: 0, y: 12)
+    }
+}
+
+// Helper View for Macros
+struct MacroView: View {
+    let label: String
+    let amount: String
+    let color: Color
+    
+    var body: some View {
+        VStack(alignment: .trailing) {
+            Text(label)
+                .font(.caption2)
+                .foregroundColor(.white.opacity(0.6))
+            
+            Text(amount)
+                .font(.headline)
+                .foregroundColor(color)
+        }
+    }
+}
+
+// MARK: - Weight Entry Sheet
+
+struct WeightEntrySheet: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    
+    @State private var weight: Double = 70.0
+    @State private var date: Date = Date()
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Weight") {
+                    HStack {
+                        Text("Weight")
+                        Spacer()
+                        TextField("kg", value: $weight, format: .number.precision(.fractionLength(1)))
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                        Text("kg")
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Section("Date") {
+                    DatePicker("Date", selection: $date, displayedComponents: .date)
+                }
+            }
+            .navigationTitle("Log Weight")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        let log = WeightLog(date: date, weight: weight)
+                        modelContext.insert(log)
+                        try? modelContext.save()
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Food History View
+
+struct FoodHistoryView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \FoodLog.timestamp, order: .reverse) private var allLogs: [FoodLog]
+
+    @State private var searchText = ""
+
+    var filteredLogs: [FoodLog] {
+        if searchText.isEmpty {
+            return allLogs
+        } else {
+            return allLogs.filter { $0.foodName.localizedCaseInsensitiveContains(searchText) }
+        }
+    }
+
+    var body: some View {
+        List {
+            ForEach(filteredLogs) { log in
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text(log.foodName)
+                            .font(.headline)
+                        Text("\(log.timestamp.formatted(date: .abbreviated, time: .shortened)) • \(log.category.rawValue.capitalized)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing) {
+                        Text("\(log.calories) kcal")
+                            .font(.subheadline.bold())
+                        Text("\(Int(log.protein))p \(Int(log.carbs))c \(Int(log.fats))f")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button(role: .destructive) {
+                        modelContext.delete(log)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
+            }
+        }
+        .navigationTitle("Food History")
+        .searchable(text: $searchText, prompt: "Search foods")
+        .overlay {
+            if filteredLogs.isEmpty {
+                ContentUnavailableView("No History", systemImage: "fork.knife", description: Text("You haven't logged any food yet."))
+            }
+        }
+    }
+}
+
+// MARK: - Seed Data
+
+struct FoodSeed: Hashable {
+    let name: String
+    let calories: Int
+    let protein: Double
+    let carbs: Double
+    let fat: Double
+}
+
+enum SeedData {
+
+    @MainActor
+    static func seedAll(context: ModelContext) {
+        seedExercises(context: context)
+        seedHealthyFoods(context: context)
+        seedCheatMeals(context: context)
+        try? context.save()
+    }
+
+    @MainActor
+    private static func seedExercises(context: ModelContext) {
+
+        let existing = Set(
+            (try? context.fetch(FetchDescriptor<Exercise>()))?
+                .map { $0.name.lowercased() } ?? []
+        )
+
+        let exercises: [String] = [
+            "Assisted bodyweight squat",
+            "Bodyweight squat",
+            "Assisted pistol squat",
+            "Pistol squat",
+            "Supported lunge",
+            "Regular lunge",
+            "Bulgarian split squat",
+            "Calf raise",
+            "Box jump",
+            "Step-up",
+            "Hip bridge",
+            "Single-leg deadlift",
+            "Knee push-up",
+            "Elevated push-up",
+            "Standard push-up",
+            "Decline push-up",
+            "Side-to-side push-up",
+            "Assisted dip",
+            "Dip",
+            "Handstand wall walk",
+            "Inverted row (high)",
+            "Inverted row (low)",
+            "Pull-up",
+            "Chin-up",
+            "Negative pull-up",
+            "Dead hang",
+            "Plank",
+            "Side plank",
+            "Hollow body hold",
+            "V-up",
+            "Sit-up",
+            "Bicycle crunch",
+            "Mountain climber",
+            "Burpee",
+            "Jumping jack",
+            "High knees",
+            "Butt kicks",
+            "Bear crawl",
+            "Crab walk",
+            "Superman hold",
+            "Bird-dog",
+            "Glute kickback",
+            "Donkey kick",
+            "Wall sit",
+            "Skater jump",
+            "Lateral lunge",
+            "Reverse lunge",
+            "Curtsy lunge",
+            "Pike push-up",
+            "Handstand hold (wall)"
+        ]
+
+        for name in exercises where !existing.contains(name.lowercased()) {
+            context.insert(Exercise(name: name, muscleGroup: .other))
+        }
+    }
+
+    @MainActor
+    private static func seedHealthyFoods(context: ModelContext) {
+
+        let existing = Set(
+            (try? context.fetch(FetchDescriptor<FoodItem>()))?
+                .map { $0.name.lowercased() } ?? []
+        )
+
+        let foods: [FoodSeed] = [
+            FoodSeed(name: "Apple (1 medium)", calories: 95, protein: 1, carbs: 25, fat: 0),
+            FoodSeed(name: "Avocado (½ fruit)", calories: 120, protein: 1.5, carbs: 6, fat: 11),
+            FoodSeed(name: "Banana (1 medium)", calories: 105, protein: 1, carbs: 27, fat: 0.3),
+            FoodSeed(name: "Blueberries (100 g)", calories: 57, protein: 0.7, carbs: 14, fat: 0.3),
+            FoodSeed(name: "Orange (1 medium)", calories: 62, protein: 1, carbs: 15, fat: 0.2),
+            FoodSeed(name: "Strawberries (100 g)", calories: 32, protein: 0.7, carbs: 8, fat: 0.3),
+            FoodSeed(name: "Grapes (100 g)", calories: 69, protein: 0.7, carbs: 18, fat: 0.2),
+            FoodSeed(name: "Kiwi (1 medium)", calories: 42, protein: 0.8, carbs: 10, fat: 0.4),
+            FoodSeed(name: "Mango (100 g)", calories: 60, protein: 0.8, carbs: 15, fat: 0.4),
+            FoodSeed(name: "Watermelon (100 g)", calories: 30, protein: 0.6, carbs: 8, fat: 0.2),
+
+            FoodSeed(name: "Almonds (28 g)", calories: 164, protein: 6, carbs: 6, fat: 14),
+            FoodSeed(name: "Walnuts (28 g)", calories: 185, protein: 4.3, carbs: 3.9, fat: 18),
+            FoodSeed(name: "Chia seeds (28 g)", calories: 138, protein: 4.7, carbs: 12, fat: 8.7),
+            FoodSeed(name: "Flaxseeds (10 g)", calories: 55, protein: 1.9, carbs: 3, fat: 4.3),
+            FoodSeed(name: "Pumpkin seeds (28 g)", calories: 151, protein: 7, carbs: 5, fat: 13),
+
+            FoodSeed(name: "Rolled oats (40 g dry)", calories: 150, protein: 5, carbs: 27, fat: 3),
+            FoodSeed(name: "Quinoa (100 g cooked)", calories: 120, protein: 4.4, carbs: 21, fat: 1.9),
+            FoodSeed(name: "Brown rice (100 g cooked)", calories: 123, protein: 2.6, carbs: 26, fat: 1),
+            FoodSeed(name: "Sweet potato (1 medium)", calories: 103, protein: 2, carbs: 24, fat: 0.2),
+
+            FoodSeed(name: "Broccoli (100 g)", calories: 35, protein: 2.8, carbs: 7, fat: 0.4),
+            FoodSeed(name: "Spinach (100 g)", calories: 23, protein: 2.9, carbs: 3.6, fat: 0.4),
+            FoodSeed(name: "Kale (100 g)", calories: 49, protein: 4.3, carbs: 9, fat: 0.9),
+            FoodSeed(name: "Carrots (100 g)", calories: 41, protein: 0.9, carbs: 10, fat: 0.2),
+
+            FoodSeed(name: "Lentils (100 g cooked)", calories: 116, protein: 9, carbs: 20, fat: 0.4),
+            FoodSeed(name: "Chickpeas (100 g cooked)", calories: 164, protein: 9, carbs: 27, fat: 2.6),
+            FoodSeed(name: "Black beans (100 g cooked)", calories: 132, protein: 8.9, carbs: 24, fat: 0.5),
+
+            FoodSeed(name: "Salmon (100 g cooked)", calories: 206, protein: 22, carbs: 0, fat: 12),
+            FoodSeed(name: "Tuna (100 g canned)", calories: 132, protein: 28, carbs: 0, fat: 1),
+            FoodSeed(name: "Chicken breast (100 g cooked)", calories: 165, protein: 31, carbs: 0, fat: 3.6),
+            FoodSeed(name: "Egg (1 large)", calories: 72, protein: 6.3, carbs: 0.4, fat: 4.8),
+
+            FoodSeed(name: "Greek yogurt (170 g)", calories: 100, protein: 17, carbs: 6, fat: 0.7),
+            FoodSeed(name: "Cottage cheese (113 g)", calories: 98, protein: 11, carbs: 3, fat: 4),
+            FoodSeed(name: "Tofu (100 g)", calories: 94, protein: 10, carbs: 2, fat: 6),
+
+            FoodSeed(name: "Olive oil (1 tbsp)", calories: 119, protein: 0, carbs: 0, fat: 14),
+            FoodSeed(name: "Dark chocolate 70% (28 g)", calories: 170, protein: 2, carbs: 13, fat: 12)
+        ]
+
+        for f in foods where !existing.contains(f.name.lowercased()) {
+            context.insert(
+                FoodItem(
+                    name: f.name,
+                    calories: f.calories,
+                    protein: f.protein,
+                    carbs: f.carbs,
+                    fats: f.fat,
+                    defaultServingSize: 1,
+                    category: "Healthy Food"
+                )
+            )
+        }
+    }
+
+    @MainActor
+    private static func seedCheatMeals(context: ModelContext) {
+
+        let existing = Set(
+            (try? context.fetch(FetchDescriptor<FoodItem>()))?
+                .map { $0.name.lowercased() } ?? []
+        )
+
+        let cheats: [FoodSeed] = [
+            FoodSeed(name: "Chick-fil-A waffle fries (small)", calories: 280, protein: 4, carbs: 33, fat: 14),
+            FoodSeed(name: "Chick-fil-A chicken sandwich", calories: 440, protein: 28, carbs: 41, fat: 18),
+            FoodSeed(name: "In-N-Out Double-Double burger", calories: 670, protein: 37, carbs: 39, fat: 41),
+            FoodSeed(name: "Five Guys bacon cheeseburger", calories: 920, protein: 45, carbs: 40, fat: 62),
+            FoodSeed(name: "Pizza slice (pepperoni)", calories: 285, protein: 12, carbs: 36, fat: 10),
+            FoodSeed(name: "Taco Bell Crunchwrap Supreme", calories: 530, protein: 17, carbs: 71, fat: 21),
+            FoodSeed(name: "Wendy's Baconator", calories: 970, protein: 57, carbs: 36, fat: 66),
+            FoodSeed(name: "McDonald's Big Tasty", calories: 850, protein: 51, carbs: 48, fat: 51),
+            FoodSeed(name: "Panda Express Orange Chicken", calories: 490, protein: 25, carbs: 45, fat: 26)
+        ]
+
+        for c in cheats where !existing.contains(c.name.lowercased()) {
+            context.insert(
+                FoodItem(
+                    name: c.name,
+                    calories: c.calories,
+                    protein: c.protein,
+                    carbs: c.carbs,
+                    fats: c.fat,
+                    defaultServingSize: 1,
+                    category: "Cheat Meal"
+                )
+            )
+        }
     }
 }

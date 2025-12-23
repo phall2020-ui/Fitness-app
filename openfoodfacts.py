@@ -63,11 +63,13 @@ class OpenFoodFactsClient:
             List of matching products
         """
         try:
-            url = f"{self.BASE_URL}/search"
+            url = "https://world.openfoodfacts.org/cgi/search.pl"
             params = {
                 "search_terms": query,
-                "page_size": limit,
-                "json": True
+                "search_simple": 1,
+                "action": "process",
+                "json": 1,
+                "page_size": limit
             }
             response = await self.client.get(url, params=params)
             

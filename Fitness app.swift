@@ -20,6 +20,7 @@ import Foundation
 import Charts
 import VisionKit
 import AVFoundation
+import Speech
 
 // MARK: - 1) ENUMS & STRUCTS
 
@@ -1461,72 +1462,29 @@ struct DailySummaryCard: View {
     var summary: (kcal: Int, protein: Double, carbs: Double, fats: Double)?
     
     var caloricTarget: Int { NutritionManager.shared.calculateCaloricTarget(profile: profile) }
+    private var today: Date { Date() }
+    
+    private var weekdayString: String {
+        today.formatted(.dateTime.weekday(.wide))
+    }
     
     var body: some View {
         let remaining = max(0, caloricTarget - (summary?.kcal ?? 0))
-        let proteinRemaining = max(0, profile.proteinGoal - Int(summary?.protein ?? 0))
+        let consumedCalories = summary?.kcal ?? 0
+        let progress = caloricTarget > 0 ? Double(consumedCalories) / Double(caloricTarget) : 0
+        let clampedProgress = min(max(progress, 0), 1)
         
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Nutrition Goal: \(caloricTarget) kcal")
-                .font(.headline)
-            
-            HStack {
-                VStack {
-                    Text("\(remaining)")
-                        .font(.largeTitle).bold()
-                        .foregroundColor(remaining < caloricTarget / 5 ? .red : .green)
-                    Text("Calories Left")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                
-                VStack {
-                    Text("\(proteinRemaining)g")
-                        .font(.largeTitle).bold()
-                        .foregroundColor(proteinRemaining <= 0 ? .green : .orange)
-                    Text("Protein Left")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .padding(.vertical, 10)
-            
-            Divider()
-            
-            VStack(spacing: 5) {
-                MacroProgressView(label: "Protein", current: summary?.protein ?? 0, goal: Double(profile.proteinGoal))
-                let fatCals = (summary?.fats ?? 0) * 9
-                let proteinCals = Double(profile.proteinGoal) * 4
-                let remainingForCarbs = max(0.0, Double(caloricTarget) - proteinCals - fatCals)
-                MacroProgressView(label: "Carbs", current: summary?.carbs ?? 0, goal: remainingForCarbs / 4.0)
-            }
-        }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(radius: 5)
-    }
-}
-
-struct MacroProgressView: View {
-    let label: String
-    let current: Double
-    let goal: Double
-    
-    var progress: Double { goal > 0 ? min(current / goal, 1.0) : 0 }
-    
-    var body: some View {
-        HStack {
-            Text(label)
-                .font(.caption)
-                .frame(width: 60, alignment: .leading)
-            ProgressView(value: progress)
-            Text("\(Int(current))/\(Int(goal))g")
-                .font(.caption)
-                .frame(width: 85, alignment: .trailing)
-        }
+        GlassCardView(
+            title: "Today",
+            subtitle: weekdayString,
+            caloriesLeft: remaining,
+            caloriesDetail: "\(consumedCalories) / \(caloricTarget) kcal",
+            progress: clampedProgress,
+            macroItems: [
+                (label: "Protein", amount: "\(Int(summary?.protein ?? 0))g", color: .orange),
+                (label: "Fat", amount: "\(Int(summary?.fats ?? 0))g", color: .green)
+            ]
+        )
     }
 }
 
@@ -1594,18 +1552,50 @@ struct WeightTrendChart: View {
                 .font(.headline)
                 .padding(.leading)
             
-            Chart {
-                ForEach(weightLogs.sorted(by: { $0.date < $1.date }), id: \.date) { log in
-                    LineMark(
-                        x: .value("Date", log.date),
-                        y: .value("Weight", log.weight)
-                    )
-                    .symbol(.circle)
+            if weightLogs.count >= 2 {
+                Chart {
+                    ForEach(weightLogs.sorted(by: { $0.date < $1.date }), id: \.date) { log in
+                        LineMark(
+                            x: .value("Date", log.date),
+                            y: .value("Weight", log.weight)
+                        )
+                        .symbol(.circle)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.purple, .blue],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        
+                        PointMark(
+                            x: .value("Date", log.date),
+                            y: .value("Weight", log.weight)
+                        )
+                        .foregroundStyle(.purple)
+                    }
                 }
+                .chartYAxisLabel("Weight (kg)")
+                .chartXAxis(.hidden)
+                .padding(.top, 10)
+            } else {
+                VStack(spacing: 12) {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(.system(size: 40))
+                        .foregroundColor(.gray.opacity(0.5))
+                    
+                    Text("Track your weight progress")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    Text("Log at least 2 weigh-ins to see your trend chart")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 30)
             }
-            .chartYAxisLabel("Weight (kg)")
-            .chartXAxis(.hidden)
-            .padding(.top, 10)
         }
         .padding()
         .background(Color(.systemBackground))
@@ -2201,6 +2191,7 @@ struct DashboardView: View {
     
     @Query(sort: \WeightLog.date, order: .reverse) private var weightLogs: [WeightLog]
     @Query(sort: \WorkoutSession.startTime, order: .reverse) private var workouts: [WorkoutSession]
+    @Query(sort: \FoodLog.timestamp, order: .reverse) private var foodLogs: [FoodLog]
     
     // Quick Add Food states
     @State private var showQuickAddMenu = false
@@ -2210,60 +2201,110 @@ struct DashboardView: View {
     @StateObject private var cameraPermission = CameraPermission()
     @State private var showCameraDeniedAlert = false
     
+    // Card carousel
+    @State private var currentCardIndex = 0
+    
     private let nutritionManager = NutritionManager.shared
     private let today = Date()
     
+    // Computed properties for today's data
+    private var todaysLogs: [FoodLog] {
+        foodLogs.filter { Calendar.current.isDateInToday($0.timestamp) }
+    }
+    
+    private var mealsLogged: Int {
+        Set(todaysLogs.map { $0.category }).count
+    }
+    
+    private var totalCalories: Int {
+        todaysLogs.reduce(0) { $0 + $1.calories }
+    }
+    
+    private var totalProtein: Double {
+        todaysLogs.reduce(0) { $0 + $1.protein }
+    }
+    
+    private var totalCarbs: Double {
+        todaysLogs.reduce(0) { $0 + $1.carbs }
+    }
+    
+    private var totalFats: Double {
+        todaysLogs.reduce(0) { $0 + $1.fats }
+    }
+    
+    private var calorieGoal: Int {
+        guard let profile = profile else { return 2000 }
+        return nutritionManager.calculateCaloricTarget(profile: profile)
+    }
+    
+    private var proteinGoal: Int { profile?.proteinGoal ?? 150 }
+    private var carbGoal: Int { 250 }
+    private var fatGoal: Int { 67 }
+    
+    private var motivationalMessage: String {
+        if mealsLogged == 0 {
+            return "Let's get started!"
+        } else if mealsLogged >= 3 && totalProtein >= Double(proteinGoal) * 0.8 {
+            return "Crushing it!"
+        } else if mealsLogged >= 2 {
+            return "Keep it up!"
+        } else {
+            return "Good start!"
+        }
+    }
+    
+    private var progressDescription: String {
+        if mealsLogged == 0 {
+            return "Start logging your meals to track progress!"
+        }
+        return "You've logged \(mealsLogged) meal\(mealsLogged == 1 ? "" : "s") and \(Int(totalProtein))g of protein. See how to boost your progress!"
+    }
+    
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .bottomTrailing) {
+            ZStack(alignment: .bottom) {
                 ScrollView {
-                    VStack(spacing: 20) {
-                        if let profile = profile {
-                            DailySummaryCard(profile: profile, summary: nutritionManager.getDailySummary(for: today, context: modelContext))
-                            
-                            WeightTrackingCard(
-                                currentWeight: profile.currentWeight,
-                                trendWeight: nutritionManager.calculateTrendWeight(logs: weightLogs)
-                            )
-                        } else {
-                            Text("Setting up User Profile…")
-                        }
-                        
-                        WeightTrendChart(weightLogs: weightLogs)
-                            .frame(height: 220)
+                    VStack(spacing: 16) {
+                        loggingProgressCard
                             .padding(.horizontal)
                         
-                        // Extra padding at bottom for FAB
-                        Spacer().frame(height: 80)
-                    }
-                    .padding()
-                }
-                
-                // Floating Action Button for Quick Add Food
-                QuickAddFoodButton(
-                    showMenu: $showQuickAddMenu,
-                    selectedMeal: $selectedQuickMeal,
-                    onScanTapped: {
-                        Task {
-                            cameraPermission.refresh()
-                            if !cameraPermission.authorised {
-                                await cameraPermission.request()
-                            }
-                            if cameraPermission.authorised {
-                                showQuickScanSheet = true
-                            } else {
-                                showCameraDeniedAlert = true
+                        macrosCard
+                            .padding(.horizontal)
+                        
+                        HStack(spacing: 6) {
+                            ForEach(0..<4, id: \.self) { index in
+                                Circle()
+                                    .fill(index == currentCardIndex ? Color.blue : Color.gray.opacity(0.3))
+                                    .frame(width: 8, height: 8)
                             }
                         }
-                    },
-                    onManualTapped: {
-                        showQuickAddSheet = true
+                        .padding(.vertical, 8)
+                        
+                        HStack(spacing: 12) {
+                            stepsCard
+                            exerciseCard
+                        }
+                        .padding(.horizontal)
+                        
+                        weightProgressCard
+                            .padding(.horizontal)
+                        
+                        Spacer().frame(height: 100)
                     }
-                )
-                .padding(.trailing, 20)
-                .padding(.bottom, 20)
+                    .padding(.top, 8)
+                }
+                .background(Color(.systemGroupedBackground))
+                
+                floatingAddButton
             }
-            .navigationTitle("Today's Fuel ⚡️")
+            .navigationTitle("Today")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Edit") { }
+                        .foregroundColor(.blue)
+                }
+            }
             .alert("Camera permission needed", isPresented: $showCameraDeniedAlert) {
                 Button("OK", role: .cancel) {}
                 Button("Open Settings") {
@@ -2275,16 +2316,291 @@ struct DashboardView: View {
                 Text("Enable camera access in Settings to scan barcodes.")
             }
             .sheet(isPresented: $showQuickScanSheet) {
-                FoodScanSheet(selectedMealCategory: selectedQuickMeal) {
-                    // Food logged successfully
-                }
+                FoodScanSheet(selectedMealCategory: selectedQuickMeal) { }
             }
             .sheet(isPresented: $showQuickAddSheet) {
                 QuickAddFoodSheet(mealCategory: selectedQuickMeal)
+                    .presentationDetents([.fraction(0.9), .large])
+                    .presentationDragIndicator(.visible)
             }
         }
         .onAppear {
             fetchUserProfile()
+        }
+    }
+    
+    // MARK: - Logging Progress Card
+    
+    private var loggingProgressCard: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Spacer()
+                Button { } label: {
+                    Image(systemName: "plus")
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            VStack(spacing: 8) {
+                Text("Logging Progress")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                
+                Text(motivationalMessage)
+                    .font(.title2)
+                    .fontWeight(.bold)
+            }
+            
+            ZStack {
+                ProgressArc(progress: 1.0)
+                    .stroke(Color.gray.opacity(0.2), lineWidth: 8)
+                    .frame(height: 60)
+                
+                ProgressArc(progress: min(Double(mealsLogged) / 4.0, 1.0))
+                    .stroke(
+                        LinearGradient(colors: [.gray, .blue], startPoint: .leading, endPoint: .trailing),
+                        style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                    )
+                    .frame(height: 60)
+            }
+            .padding(.horizontal, 40)
+            
+            HStack {
+                Text(progressDescription)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.leading)
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+    }
+    
+    // MARK: - Macros Card
+    
+    private var macrosCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Macros")
+                .font(.headline)
+            
+            HStack(spacing: 16) {
+                macroRing(title: "Net Carbs", current: Int(totalCarbs), goal: carbGoal, color: .gray)
+                macroRing(title: "Fat", current: Int(totalFats), goal: fatGoal, color: .purple)
+                macroRing(title: "Protein", current: Int(totalProtein), goal: proteinGoal, color: .orange)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+    }
+    
+    private func macroRing(title: String, current: Int, goal: Int, color: Color) -> some View {
+        let remaining = max(goal - current, 0)
+        let progress = goal > 0 ? min(Double(current) / Double(goal), 1.0) : 0
+        
+        return VStack(spacing: 8) {
+            Text(title)
+                .font(.caption)
+                .foregroundColor(color)
+            
+            ZStack {
+                Circle()
+                    .stroke(Color.gray.opacity(0.2), lineWidth: 8)
+                
+                Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(color, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                
+                VStack(spacing: 0) {
+                    Text("\(current)")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                    Text("/\(goal)g")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .frame(width: 80, height: 80)
+            
+            Text("\(remaining)g left")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+    
+    // MARK: - Steps Card
+    
+    private var stepsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Steps")
+                .font(.headline)
+            
+            HStack(spacing: 6) {
+                Image(systemName: "figure.walk")
+                    .foregroundColor(.red)
+                Text("6,000")
+                    .font(.title2)
+                    .fontWeight(.bold)
+            }
+            
+            Text("Goal: 15,000")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(height: 6)
+                    
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.red)
+                        .frame(width: geometry.size.width * 0.4, height: 6)
+                }
+            }
+            .frame(height: 6)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+    }
+    
+    // MARK: - Exercise Card
+    
+    private var exerciseCard: some View {
+        let todaysWorkouts = workouts.filter { Calendar.current.isDateInToday($0.startTime) }
+        let totalMinutes = todaysWorkouts.reduce(0) { total, workout in
+            let duration = workout.endTime?.timeIntervalSince(workout.startTime) ?? 0
+            return total + Int(duration / 60)
+        }
+        let estimatedCalories = totalMinutes * 8
+        
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Exercise")
+                    .font(.headline)
+                Spacer()
+                Button { } label: {
+                    Image(systemName: "plus")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            HStack(spacing: 6) {
+                Image(systemName: "flame.fill")
+                    .foregroundColor(.orange)
+                Text("\(estimatedCalories) cal")
+                    .font(.title3)
+                    .fontWeight(.semibold)
+            }
+            
+            HStack(spacing: 6) {
+                Image(systemName: "clock.fill")
+                    .foregroundColor(.orange)
+                Text("\(totalMinutes / 60):\(String(format: "%02d", totalMinutes % 60)) hr")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+    }
+    
+    // MARK: - Weight Progress Card
+    
+    private var weightProgressCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Weight Progress")
+                    .font(.headline)
+                Spacer()
+                if let latest = weightLogs.first {
+                    Text("\(latest.weight, specifier: "%.1f") kg")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            if weightLogs.count >= 2 {
+                Chart {
+                    ForEach(weightLogs.prefix(7).reversed(), id: \.date) { log in
+                        LineMark(
+                            x: .value("Date", log.date),
+                            y: .value("Weight", log.weight)
+                        )
+                        .foregroundStyle(
+                            LinearGradient(colors: [.purple, .blue], startPoint: .leading, endPoint: .trailing)
+                        )
+                        .symbol(.circle)
+                        
+                        PointMark(
+                            x: .value("Date", log.date),
+                            y: .value("Weight", log.weight)
+                        )
+                        .foregroundStyle(.purple)
+                    }
+                }
+                .chartXAxis(.hidden)
+                .chartYAxis {
+                    AxisMarks(position: .leading)
+                }
+                .frame(height: 120)
+            } else {
+                VStack(spacing: 8) {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(.title)
+                        .foregroundColor(.gray.opacity(0.5))
+                    Text("Log at least 2 weigh-ins to see your trend")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 100)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(16)
+    }
+    
+    // MARK: - Floating Add Button
+    
+    private var floatingAddButton: some View {
+        VStack {
+            Spacer()
+            HStack {
+                Spacer()
+                Button {
+                    showQuickAddSheet = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.title2.bold())
+                        .foregroundColor(.white)
+                        .frame(width: 56, height: 56)
+                        .background(
+                            Circle()
+                                .fill(Color.blue)
+                                .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
+                        )
+                }
+                .padding(.trailing, 20)
+                .padding(.bottom, 20)
+            }
         }
     }
     
@@ -2301,6 +2617,33 @@ struct DashboardView: View {
         } catch {
             print("Error fetching or creating profile: \(error)")
         }
+    }
+}
+
+// MARK: - Progress Arc Shape
+
+struct ProgressArc: Shape {
+    var progress: Double
+    
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+    
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let center = CGPoint(x: rect.midX, y: rect.maxY)
+        let radius = min(rect.width / 2, rect.height)
+        
+        path.addArc(
+            center: center,
+            radius: radius,
+            startAngle: .degrees(180),
+            endAngle: .degrees(180 + (180 * progress)),
+            clockwise: false
+        )
+        
+        return path
     }
 }
 
@@ -2961,6 +3304,10 @@ struct QuickAddFoodSheet: View {
     @State private var servingSize: String = "100"
     
     @Query(sort: \FoodLog.timestamp, order: .reverse) private var recentLogs: [FoodLog]
+    @Query(sort: \FoodItem.name, order: .forward) private var savedFoods: [FoodItem]
+    
+    @State private var showScanSheet = false
+    @State private var showVoiceSheet = false
     
     var recentFoods: [FoodLog] {
         // Get unique food names from last 20 logs
@@ -3067,6 +3414,19 @@ struct QuickAddFoodSheet: View {
                     Button("Cancel") { dismiss() }
                 }
             }
+            .background(Color.clear)
+        }
+        .preferredColorScheme(.dark)
+        .sheet(isPresented: $showScanSheet) {
+            FoodScanSheet(selectedMealCategory: mealCategory) { }
+        }
+        .sheet(isPresented: $showVoiceSheet) {
+            VoiceDictationSheet { parsedResult in
+                foodName = parsedResult.foodName
+                if let grams = parsedResult.servingInGrams {
+                    servingSize = String(Int(grams.rounded()))
+                }
+            }
         }
     }
     
@@ -3083,6 +3443,878 @@ struct QuickAddFoodSheet: View {
         )
         modelContext.insert(entry)
         try? modelContext.save()
+        dismiss()
+    }
+    
+    // MARK: - Themed Subviews
+    
+    private var header: some View {
+        HStack {
+            Button("Cancel") { dismiss() }
+                .font(.headline)
+                .foregroundColor(.ironTextPrimary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color.white.opacity(0.08))
+                .cornerRadius(16)
+            
+            Spacer()
+            
+            Text("Add to \(mealCategory.rawValue.capitalized)")
+                .font(.headline)
+                .foregroundColor(.ironTextPrimary)
+            
+            Spacer()
+            
+            Circle()
+                .fill(Color.ironCardBg)
+                .frame(width: 36, height: 36)
+                .overlay(Image(systemName: "flame.fill").foregroundColor(.ironWarning))
+        }
+    }
+    
+    private var quickActions: some View {
+        HStack(spacing: 16) {
+            QuickActionButton(
+                title: "Scan",
+                systemImage: "barcode.viewfinder",
+                gradient: LinearGradient(colors: [.ironWarning, .orange], startPoint: .topLeading, endPoint: .bottomTrailing)
+            ) {
+                showScanSheet = true
+            }
+            
+            QuickActionButton(
+                title: "Voice",
+                systemImage: "mic.fill",
+                gradient: LinearGradient(colors: [.ironSuccess, .green], startPoint: .topLeading, endPoint: .bottomTrailing)
+            ) {
+                showVoiceSheet = true
+            }
+        }
+    }
+    
+    private func foodListCard(title: String, subtitle: String, foods: [FoodShortcut]) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundColor(.ironTextPrimary)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundColor(.ironTextSecondary)
+            }
+            
+            ForEach(foods) { shortcut in
+                Button {
+                    logFood(
+                        name: shortcut.name,
+                        cal: shortcut.calories,
+                        p: shortcut.protein,
+                        c: shortcut.carbs,
+                        f: shortcut.fats,
+                        serving: shortcut.serving
+                    )
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(shortcut.name)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(.ironTextPrimary)
+                            Text(shortcut.detail)
+                                .font(.caption)
+                                .foregroundColor(.ironTextSecondary)
+                        }
+                        Spacer()
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title3)
+                            .foregroundColor(.ironWarning)
+                    }
+                    .padding(.vertical, 4)
+                }
+                
+                if shortcut.id != foods.last?.id {
+                    Divider().background(Color.white.opacity(0.1))
+                }
+            }
+        }
+        .padding(20)
+        .ironGlassCard()
+    }
+    
+    private var quickEntryCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Quick Entry")
+                .font(.headline)
+                .foregroundColor(.ironTextPrimary)
+            
+            entryField("Food name", text: $foodName, placeholder: "e.g. Chicken Breast")
+            
+            HStack(spacing: 12) {
+                entryField("Serving (g)", text: $servingSize, keyboard: .numberPad)
+                entryField("Calories", text: $calories, keyboard: .numberPad)
+            }
+            
+            HStack(spacing: 12) {
+                entryField("Protein", text: $protein, keyboard: .decimalPad)
+                entryField("Carbs", text: $carbs, keyboard: .decimalPad)
+                entryField("Fats", text: $fats, keyboard: .decimalPad)
+            }
+            
+            Button {
+                logFood(
+                    name: foodName,
+                    cal: Int(calories) ?? 0,
+                    p: Double(protein) ?? 0,
+                    c: Double(carbs) ?? 0,
+                    f: Double(fats) ?? 0,
+                    serving: Double(servingSize) ?? 100
+                )
+            } label: {
+                Text("Add to \(mealCategory.rawValue.capitalized)")
+            }
+            .ironPrimaryButton()
+            .disabled(foodName.isEmpty)
+            .opacity(foodName.isEmpty ? 0.5 : 1)
+        }
+        .padding(20)
+        .ironGlassCard()
+    }
+    
+    private func entryField(_ title: String, text: Binding<String>, placeholder: String = "0", keyboard: UIKeyboardType = .default) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.ironTextSecondary)
+            TextField(placeholder, text: text)
+                .keyboardType(keyboard)
+                .textInputAutocapitalization(.never)
+                .disableAutocorrection(true)
+                .padding()
+                .background(Color.white.opacity(0.05))
+                .cornerRadius(12)
+                .foregroundColor(.ironTextPrimary)
+        }
+    }
+    
+    private struct FoodShortcut: Identifiable, Equatable {
+        let id = UUID()
+        let name: String
+        let detail: String
+        let calories: Int
+        let protein: Double
+        let carbs: Double
+        let fats: Double
+        let serving: Double
+    }
+    
+    private struct QuickActionButton: View {
+        let title: String
+        let systemImage: String
+        let gradient: LinearGradient
+        let action: () -> Void
+        
+        var body: some View {
+            Button(action: action) {
+                VStack(spacing: 8) {
+                    Image(systemName: systemImage)
+                        .font(.title2)
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(gradient)
+                .cornerRadius(Layout.cornerRadius)
+                .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 6)
+            }
+        }
+    }
+}
+
+// MARK: - Food Diary 2.0
+
+struct DayLog {
+    struct MacroBreakdown {
+        let protein: Int
+        let carbs: Int
+        let fats: Int
+    }
+    
+    var date: Date
+    var calorieGoal: Int
+    var meals: [MealType: [MealEntry]]
+    var macros: MacroBreakdown?
+    
+    var caloriesConsumed: Int {
+        meals.values.flatMap { $0 }.reduce(0) { $0 + $1.calories }
+    }
+    
+    var caloriesRemaining: Int {
+        max(calorieGoal - caloriesConsumed, 0)
+    }
+    
+    static let sample: DayLog = DayLog(
+        date: Date(),
+        calorieGoal: 2400,
+        meals: [
+            .breakfast: [
+                MealEntry(name: "Greek Yogurt", calories: 180, quantity: "200g"),
+                MealEntry(name: "Blueberries", calories: 80, quantity: "100g")
+            ],
+            .lunch: [
+                MealEntry(name: "Chicken Breast", calories: 320, quantity: "180g"),
+                MealEntry(name: "Brown Rice", calories: 220, quantity: "150g")
+            ],
+            .dinner: [
+                MealEntry(name: "Salmon", calories: 410, quantity: "200g"),
+                MealEntry(name: "Roasted Veg", calories: 150, quantity: "200g")
+            ],
+            .snacks: [
+                MealEntry(name: "Protein Shake", calories: 220, quantity: "1 scoop"),
+                MealEntry(name: "Almonds", calories: 160, quantity: "30g")
+            ]
+        ],
+        macros: .init(protein: 180, carbs: 210, fats: 70)
+    )
+}
+
+struct MealEntry: Identifiable {
+    let id = UUID()
+    let name: String
+    let calories: Int
+    let quantity: String?
+}
+
+enum MealType: String, CaseIterable, Codable {
+    case breakfast, lunch, dinner, snacks
+    
+    var displayName: String { rawValue.capitalized }
+}
+
+struct FoodDiaryScreen: View {
+    @State private var dayLog: DayLog
+    @State private var showMacroSummary = false
+    @State private var collapsedMeals: Set<MealType> = []
+    
+    @AppStorage("diary_lastMeal") private var lastMealRaw = MealType.breakfast.rawValue
+    @AppStorage("diary_collapsedMeals") private var collapsedMealsRaw = ""
+    @AppStorage("diary_units") private var preferredUnits = "g"
+    
+    init(dayLog: DayLog = .sample) {
+        _dayLog = State(initialValue: dayLog)
+    }
+    
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 16, pinnedViews: [.sectionHeaders]) {
+                Section(header: headerView) {
+                    DailySummaryPanel(
+                        remaining: dayLog.caloriesRemaining,
+                        consumed: dayLog.caloriesConsumed,
+                        goal: dayLog.calorieGoal
+                    )
+                    .padding(.horizontal, Layout.padding)
+                }
+                
+                ForEach(MealType.allCases, id: \.self) { meal in
+                    MealSectionView(
+                        meal: meal,
+                        entries: dayLog.meals[meal] ?? [],
+                        isCollapsed: collapsedMeals.contains(meal),
+                        totalCalories: totalCalories(for: meal),
+                        onHeaderTap: { toggleMeal(meal) },
+                        onAddTapped: { handleAdd(for: meal) },
+                        onItemTapped: { entry in
+                            print("Edit \(entry.name)")
+                        }
+                    )
+                    .padding(.horizontal, Layout.padding)
+                }
+                
+                if let macros = dayLog.macros {
+                    MacroSummaryView(macros: macros, isExpanded: $showMacroSummary)
+                        .padding(.horizontal, Layout.padding)
+                }
+            }
+            .padding(.vertical, Layout.padding)
+        }
+        .background(Color(.systemGroupedBackground))
+        .onAppear {
+            collapsedMeals = Set(
+                collapsedMealsRaw.split(separator: ",").compactMap { MealType(rawValue: String($0)) }
+            )
+        }
+    }
+    
+    private var headerView: some View {
+        DateSelectorView(date: dayLog.date) { direction in
+            if direction == .previous {
+                dayLog.date = Calendar.current.date(byAdding: .day, value: -1, to: dayLog.date) ?? dayLog.date
+            } else {
+                dayLog.date = Calendar.current.date(byAdding: .day, value: 1, to: dayLog.date) ?? dayLog.date
+            }
+        }
+        .padding(.horizontal, Layout.padding)
+        .background(Color(.systemBackground))
+    }
+    
+    private func totalCalories(for meal: MealType) -> Int {
+        dayLog.meals[meal]?.reduce(0) { $0 + $1.calories } ?? 0
+    }
+    
+    private func toggleMeal(_ meal: MealType) {
+        if collapsedMeals.contains(meal) {
+            collapsedMeals.remove(meal)
+        } else {
+            collapsedMeals.insert(meal)
+        }
+        collapsedMealsRaw = collapsedMeals.map(\.rawValue).joined(separator: ",")
+    }
+    
+    private func handleAdd(for meal: MealType) {
+        lastMealRaw = meal.rawValue
+        // Hook into actual logging flow
+    }
+}
+
+private struct DateSelectorView: View {
+    enum Direction { case previous, next }
+    
+    let date: Date
+    let onChange: (Direction) -> Void
+    
+    private var isToday: Bool { Calendar.current.isDateInToday(date) }
+    
+    var body: some View {
+        HStack {
+            Button { onChange(.previous) } label: {
+                Image(systemName: "chevron.left")
+            }
+            
+            Spacer()
+            
+            VStack(spacing: 2) {
+                Text(isToday ? "Today" : date.formatted(.dateTime.weekday(.wide)))
+                    .font(.headline)
+                Text(date.formatted(date: .abbreviated, time: .omitted))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            HStack(spacing: 16) {
+                Button { onChange(.next) } label: {
+                    Image(systemName: "chevron.right")
+                }
+                Button { } label: {
+                    Image(systemName: "calendar")
+                }
+            }
+        }
+        .font(.title3.weight(.semibold))
+        .foregroundColor(.primary)
+        .padding(.vertical, 8)
+    }
+}
+
+private struct DailySummaryPanel: View {
+    let remaining: Int
+    let consumed: Int
+    let goal: Int
+    
+    private var ratio: Double {
+        guard goal > 0 else { return 0 }
+        return min(Double(consumed) / Double(goal), 1.2)
+    }
+    
+    private var progressColor: Color {
+        switch ratio {
+        case ..<0.9: return .gray
+        case ..<1.0: return .orange
+        default: return .red
+        }
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Calories Remaining")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            
+            Text("\(remaining)")
+                .font(.system(size: 36, weight: .bold))
+                .foregroundColor(.primary)
+            
+            Text("\(consumed) consumed • Goal \(goal)")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            ProgressView(value: min(ratio, 1.0))
+                .progressViewStyle(.linear)
+                .tint(progressColor)
+        }
+        .padding(.vertical, 12)
+    }
+}
+
+private struct MealSectionView: View {
+    let meal: MealType
+    let entries: [MealEntry]
+    let isCollapsed: Bool
+    let totalCalories: Int
+    let onHeaderTap: () -> Void
+    let onAddTapped: () -> Void
+    let onItemTapped: (MealEntry) -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button(action: onHeaderTap) {
+                HStack {
+                    Text(meal.displayName)
+                        .font(.headline)
+                    Spacer()
+                    Text("\(totalCalories) kcal")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Image(systemName: isCollapsed ? "chevron.down" : "chevron.up")
+                        .foregroundColor(.secondary)
+                }
+                .contentShape(Rectangle())
+            }
+            
+            if !isCollapsed {
+                VStack(spacing: 0) {
+                    ForEach(entries) { entry in
+                        Button { onItemTapped(entry) } label: {
+                            FoodItemRow(entry: entry)
+                        }
+                        .buttonStyle(.plain)
+                        
+                        if entry.id != entries.last?.id {
+                            Divider()
+                        }
+                    }
+                }
+                
+                AddFoodButton(title: "+ Add Food", action: onAddTapped)
+                    .padding(.top, 4)
+            }
+            
+            Divider()
+        }
+    }
+}
+
+private struct FoodItemRow: View {
+    let entry: MealEntry
+    
+    var body: some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.name)
+                    .font(.body)
+                    .foregroundColor(.primary)
+                    .lineLimit(2)
+                    .truncationMode(.tail)
+                if let quantity = entry.quantity, !quantity.isEmpty {
+                    Text(quantity)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            Spacer()
+            Text("\(entry.calories)")
+                .font(.body.weight(.medium))
+                .foregroundColor(.primary)
+        }
+        .padding(.vertical, 8)
+    }
+}
+
+private struct AddFoodButton: View {
+    let title: String
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.orange)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 8)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct MacroSummaryView: View {
+    let macros: DayLog.MacroBreakdown
+    @Binding var isExpanded: Bool
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                withAnimation(.spring) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack {
+                    Text("Macro Summary")
+                        .font(.headline)
+                    Spacer()
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .foregroundColor(.secondary)
+                }
+            }
+            .buttonStyle(.plain)
+            
+            if isExpanded {
+                HStack(spacing: 16) {
+                    macroChip(label: "Protein", value: macros.protein)
+                    macroChip(label: "Carbs", value: macros.carbs)
+                    macroChip(label: "Fat", value: macros.fats)
+                }
+            }
+        }
+        .padding(.vertical, 12)
+    }
+    
+    private func macroChip(label: String, value: Int) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Text("\(value) g")
+                .font(.subheadline.weight(.semibold))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+struct FoodDiaryScreen_Previews: PreviewProvider {
+    static var previews: some View {
+        FoodDiaryScreen()
+    }
+}
+
+// MARK: - Voice Dictation
+
+struct VoiceDictationParsedResult {
+    let transcript: String
+    let foodName: String
+    let servingInGrams: Double?
+}
+
+enum VoiceDictationParser {
+    static func parse(_ text: String) -> VoiceDictationParsedResult? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        
+        let pattern = #"(\d+\.?\d*)\s*(g|grams?|kg|kilograms?|ml|milliliters?|oz|ounces?|cups?|cup|tbsp|tablespoons?|tsp|teaspoons?|pieces?)?\s+(.+)"#
+        if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) {
+            let nsRange = NSRange(trimmed.startIndex..<trimmed.endIndex, in: trimmed)
+            if let match = regex.firstMatch(in: trimmed, options: [], range: nsRange),
+               let amountRange = Range(match.range(at: 1), in: trimmed),
+               let amount = Double(trimmed[amountRange]),
+               let foodRange = Range(match.range(at: 3), in: trimmed) {
+                
+                var unit: String? = nil
+                if match.range(at: 2).location != NSNotFound,
+                   let unitRange = Range(match.range(at: 2), in: trimmed) {
+                    unit = String(trimmed[unitRange]).lowercased()
+                }
+                
+                let grams = convertToGrams(amount: amount, unit: unit)
+                let foodName = String(trimmed[foodRange]).trimmingCharacters(in: .whitespaces)
+                
+                return VoiceDictationParsedResult(
+                    transcript: trimmed,
+                    foodName: foodName,
+                    servingInGrams: grams
+                )
+            }
+        }
+        
+        return VoiceDictationParsedResult(transcript: trimmed, foodName: trimmed, servingInGrams: nil)
+    }
+    
+    private static func convertToGrams(amount: Double, unit: String?) -> Double {
+        guard let unit = unit else { return amount }
+        
+        switch unit {
+        case "g", "gram", "grams": return amount
+        case "kg", "kilogram", "kilograms": return amount * 1000
+        case "ml", "milliliter", "milliliters": return amount
+        case "oz", "ounce", "ounces": return amount * 28.3495
+        case "cup", "cups": return amount * 240
+        case "tbsp", "tablespoon", "tablespoons": return amount * 15
+        case "tsp", "teaspoon", "teaspoons": return amount * 5
+        default: return amount
+        }
+    }
+}
+
+@MainActor
+final class VoiceDictationViewModel: ObservableObject {
+    enum State {
+        case idle
+        case requestingPermission
+        case listening
+        case finished
+        case error(String)
+    }
+    
+    @Published var state: State = .idle
+    @Published var transcript: String = ""
+    
+    private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
+    private var recognitionTask: SFSpeechRecognitionTask?
+    private let audioEngine = AVAudioEngine()
+    private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: Locale.current.identifier))
+    
+    func startRecording() {
+        Task { await requestPermissionsAndStart() }
+    }
+    
+    func stopRecording() {
+        audioEngine.stop()
+        audioEngine.inputNode.removeTap(onBus: 0)
+        recognitionRequest?.endAudio()
+        recognitionTask?.cancel()
+        recognitionTask = nil
+        recognitionRequest = nil
+        
+        if !transcript.isEmpty {
+            state = .finished
+        } else {
+            state = .idle
+        }
+    }
+    
+    func reset() {
+        stopRecording()
+        transcript = ""
+        state = .idle
+    }
+    
+    private func requestPermissionsAndStart() async {
+        state = .requestingPermission
+        
+        let speechStatus = await withCheckedContinuation { continuation in
+            SFSpeechRecognizer.requestAuthorization { status in
+                continuation.resume(returning: status)
+            }
+        }
+        
+        guard speechStatus == .authorized else {
+            state = .error("Speech permission denied")
+            return
+        }
+        
+        let micGranted = await withCheckedContinuation { continuation in
+            AVAudioSession.sharedInstance().requestRecordPermission { granted in
+                continuation.resume(returning: granted)
+            }
+        }
+        
+        guard micGranted else {
+            state = .error("Microphone permission denied")
+            return
+        }
+        
+        do {
+            try startRecognition()
+        } catch {
+            state = .error("Could not start audio: \(error.localizedDescription)")
+        }
+    }
+    
+    private func startRecognition() throws {
+        recognitionTask?.cancel()
+        recognitionTask = nil
+        transcript = ""
+        
+        let audioSession = AVAudioSession.sharedInstance()
+        try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
+        try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+        
+        recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
+        guard let recognitionRequest = recognitionRequest else {
+            throw NSError(domain: "VoiceDictation", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create request"])
+        }
+        
+        recognitionRequest.shouldReportPartialResults = true
+        
+        let inputNode = audioEngine.inputNode
+        let recordingFormat = inputNode.outputFormat(forBus: 0)
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
+            recognitionRequest.append(buffer)
+        }
+        
+        audioEngine.prepare()
+        try audioEngine.start()
+        
+        recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+            guard let self = self else { return }
+            
+            if let result = result {
+                Task { @MainActor in
+                    self.transcript = result.bestTranscription.formattedString
+                    if result.isFinal {
+                        self.stopRecording()
+                    }
+                }
+            }
+            
+            if let error = error {
+                Task { @MainActor in
+                    self.stopRecording()
+                    self.state = .error(error.localizedDescription)
+                }
+            }
+        }
+        
+        state = .listening
+    }
+}
+
+struct VoiceDictationSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var viewModel = VoiceDictationViewModel()
+    @State private var parseMessage: String?
+    
+    let onResult: (VoiceDictationParsedResult) -> Void
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.ironBackground.ignoresSafeArea()
+                
+                VStack(spacing: 24) {
+                    Text("Talk through your meal")
+                        .font(.headline)
+                        .foregroundColor(.ironTextPrimary)
+                    
+                    Text("Example: \"250 grams chicken breast\" or \"100g oatmeal\"")
+                        .font(.caption)
+                        .foregroundColor(.ironTextSecondary)
+                        .multilineTextAlignment(.center)
+                    
+                    VStack(spacing: 16) {
+                        Image(systemName: iconName)
+                            .font(.system(size: 80))
+                            .foregroundColor(iconColor)
+                            .scaleEffect(viewModel.state == .listening ? 1.05 : 1)
+                            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: viewModel.state == .listening)
+                        
+                        Text(statusText)
+                            .font(.title3)
+                            .foregroundColor(.ironTextPrimary)
+                    }
+                    .padding(.top, 20)
+                    
+                    if !viewModel.transcript.isEmpty {
+                        Text(viewModel.transcript)
+                            .font(.body)
+                            .foregroundColor(.ironTextPrimary)
+                            .padding()
+                            .frame(maxWidth: .infinity)
+                            .background(Color.white.opacity(0.05))
+                            .cornerRadius(16)
+                    }
+                    
+                    if let parseMessage = parseMessage {
+                        Text(parseMessage)
+                            .font(.caption)
+                            .foregroundColor(.ironWarning)
+                    }
+                    
+                    Spacer()
+                    
+                    VStack(spacing: 12) {
+                        Button(action: toggleRecording) {
+                            Text(viewModel.state == .listening ? "Stop Recording" : "Start Recording")
+                                .font(.headline)
+                        }
+                        .ironPrimaryButton()
+                        
+                        Button {
+                            useTranscript()
+                        } label: {
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text("Use This Entry")
+                            }
+                            .font(.headline)
+                        }
+                        .ironGlassCard()
+                        .disabled(viewModel.transcript.isEmpty)
+                        .opacity(viewModel.transcript.isEmpty ? 0.4 : 1)
+                    }
+                }
+                .padding(Layout.padding)
+            }
+            .preferredColorScheme(.dark)
+            .onDisappear { viewModel.stopRecording() }
+            .navigationTitle("Voice Logging")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        viewModel.stopRecording()
+                        dismiss()
+                    }
+                    .foregroundColor(.ironTextPrimary)
+                }
+            }
+        }
+    }
+    
+    private var statusText: String {
+        switch viewModel.state {
+        case .idle: return "Ready when you are"
+        case .requestingPermission: return "Requesting permission..."
+        case .listening: return "Listening..."
+        case .finished: return "Tap Use to apply"
+        case .error(let message): return message
+        }
+    }
+    
+    private var iconName: String {
+        switch viewModel.state {
+        case .idle, .requestingPermission: return "mic.circle.fill"
+        case .listening: return "waveform.circle.fill"
+        case .finished: return "checkmark.circle.fill"
+        case .error: return "exclamationmark.circle.fill"
+        }
+    }
+    
+    private var iconColor: Color {
+        switch viewModel.state {
+        case .idle, .requestingPermission: return .ironTextSecondary
+        case .listening: return .ironWarning
+        case .finished: return .ironSuccess
+        case .error: return .ironError
+        }
+    }
+    
+    private func toggleRecording() {
+        if viewModel.state == .listening {
+            viewModel.stopRecording()
+        } else {
+            viewModel.startRecording()
+        }
+    }
+    
+    private func useTranscript() {
+        guard let parsed = VoiceDictationParser.parse(viewModel.transcript) else {
+            parseMessage = "Couldn't understand that. Try including an amount like \"150g\"."
+            return
+        }
+        
+        onResult(parsed)
         dismiss()
     }
 }
@@ -3378,3 +4610,114 @@ struct IronFuelApp: App {
     }
 }
 
+// MARK: - Glassmorphism Card
+
+struct GlassCardView: View {
+    let title: String
+    let subtitle: String
+    let caloriesLeft: Int
+    let caloriesDetail: String
+    let progress: Double
+    let macroItems: [(label: String, amount: String, color: Color)]
+    
+    private var progressTrim: Double {
+        min(max(progress, 0), 1)
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundColor(.white.opacity(0.85))
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.6))
+            }
+            
+            HStack {
+                ZStack {
+                    Circle()
+                        .stroke(Color.white.opacity(0.15), lineWidth: 10)
+                    
+                    Circle()
+                        .trim(from: 0, to: progressTrim)
+                        .stroke(
+                            LinearGradient(
+                                colors: [.blue, .purple],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                        )
+                        .rotationEffect(.degrees(-90))
+                    
+                    VStack(spacing: 2) {
+                        Text("\(caloriesLeft)")
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                        Text("kcal left")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.7))
+                        Text(caloriesDetail)
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                }
+                .frame(width: 130, height: 130)
+                
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 15) {
+                    ForEach(Array(macroItems.enumerated()), id: \.offset) { _, macro in
+                        MacroView(label: macro.label, amount: macro.amount, color: macro.color)
+                    }
+                }
+            }
+        }
+        .padding(20)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color(.sRGB, red: 30/255, green: 30/255, blue: 40/255, opacity: 0.9),
+                    Color(.sRGB, red: 18/255, green: 18/255, blue: 26/255, opacity: 0.7)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .overlay(.ultraThinMaterial.opacity(0.4))
+        )
+        .cornerRadius(20)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(
+                    LinearGradient(
+                        colors: [.white.opacity(0.2), .clear],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+        .shadow(color: .black.opacity(0.2), radius: 12, x: 0, y: 12)
+    }
+}
+
+// Helper View for Macros
+struct MacroView: View {
+    let label: String
+    let amount: String
+    let color: Color
+    
+    var body: some View {
+        VStack(alignment: .trailing) {
+            Text(label)
+                .font(.caption2)
+                .foregroundColor(.white.opacity(0.6))
+            
+            Text(amount)
+                .font(.headline)
+                .foregroundColor(color)
+        }
+    }
+}

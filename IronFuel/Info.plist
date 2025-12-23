@@ -65,6 +65,10 @@
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>IronFuel uses speech recognition to convert your voice commands into food entries.</string>
 
+    <!-- REQUIRED: Location permission for Gym Recognition -->
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>IronFuel uses your location to automatically detect when you are at a gym and load your history for that location.</string>
+
     <!-- Required for DataScannerViewController -->
     <key>UIRequiredDeviceCapabilities</key>
     <array>
@@ -73,5 +77,11 @@
     
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
+    
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <true/>
+    </dict>
 </dict>
 </plist>
